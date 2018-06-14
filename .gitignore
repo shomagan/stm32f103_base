@@ -1,0 +1,13 @@
+build/
+cmake_arm/
+CMakeLists.txt.user
+*.bin
+*.o
+*.elf
+*.hex
+*.lst
+*.map
+*.orig
+*.ioc
+*.mxproject
+*.cold
