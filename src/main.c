@@ -51,6 +51,7 @@
 #include "stm32f1xx_hal.h"
 #include "cmsis_os.h"
 #include "usb_device.h"
+#include "ds18.h"
 
 /* USER CODE BEGIN Includes */
 
@@ -62,6 +63,9 @@ ADC_HandleTypeDef hadc1;
 IWDG_HandleTypeDef hiwdg;
 
 RTC_HandleTypeDef hrtc;
+
+TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart1;
 
@@ -79,7 +83,13 @@ static void MX_IWDG_Init(void);
 static void MX_RTC_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_USART1_UART_Init(void);
-void StartDefaultTask(void const * argument);
+static void MX_TIM2_Init(void);
+static void MX_TIM3_Init(void);
+void default_task(void const * argument);
+
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
+                                
+                                
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -95,80 +105,30 @@ void StartDefaultTask(void const * argument);
   *
   * @retval None
   */
-int main(void)
-{
-  /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
-
-  /* MCU Configuration----------------------------------------------------------*/
-
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+int main(void){
   HAL_Init();
 
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
   SystemClock_Config();
 
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
   MX_GPIO_Init();
- // MX_IWDG_Init();
+  //MX_IWDG_Init();
   MX_RTC_Init();
   MX_ADC1_Init();
   MX_USART1_UART_Init();
-  /* USER CODE BEGIN 2 */
 
-  /* USER CODE END 2 */
+  MX_TIM3_Init();
+  MX_TIM2_Init();
 
-  /* USER CODE BEGIN RTOS_MUTEX */
-  /* add mutexes, ... */
-  /* USER CODE END RTOS_MUTEX */
-
-  /* USER CODE BEGIN RTOS_SEMAPHORES */
-  /* add semaphores, ... */
-  /* USER CODE END RTOS_SEMAPHORES */
-
-  /* USER CODE BEGIN RTOS_TIMERS */
-  /* start timers, add new ones, ... */
-  /* USER CODE END RTOS_TIMERS */
-
-  /* Create the thread(s) */
-  /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
-  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
-
-  /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
-  /* USER CODE END RTOS_THREADS */
-
-  /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
-  /* USER CODE END RTOS_QUEUES */
- 
-
+  osThreadDef(own_task, default_task, osPriorityNormal, 0, 128);
+  defaultTaskHandle = osThreadCreate(osThread(own_task), NULL);
+  osThreadDef(ds18_task, ds18_task, osPriorityHigh, 0, 128);
+  defaultTaskHandle = osThreadCreate(osThread(ds18_task), NULL);
   /* Start scheduler */
   osKernelStart();
   
-  /* We should never get here as control is now taken by the scheduler */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-
-  /* USER CODE END WHILE */
-
-  /* USER CODE BEGIN 3 */
+  while (1)  {
 
   }
-  /* USER CODE END 3 */
 
 }
 
@@ -378,6 +338,43 @@ static void MX_RTC_Init(void)
 
 }
 
+/* TIM3 init function */
+static void MX_TIM3_Init(void){
+  TIM_ClockConfigTypeDef sClockSourceConfig;
+  TIM_MasterConfigTypeDef sMasterConfig;
+  TIM_OC_InitTypeDef sConfigOC;
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 0;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 65535;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV2;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+  if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 32768;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+  HAL_TIM_MspPostInit(&htim3);
+}
+
+
 /* USART1 init function */
 static void MX_USART1_UART_Init(void)
 {
@@ -420,7 +417,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE END 4 */
 
 /* StartDefaultTask function */
-void StartDefaultTask(void const * argument)
+void default_task(void const * argument)
 {
   /* init code for USB_DEVICE */
   MX_USB_DEVICE_Init();
@@ -433,6 +430,31 @@ void StartDefaultTask(void const * argument)
   }
   /* USER CODE END 5 */ 
 }
+/* TIM2 init function */
+static void MX_TIM2_Init(void){
+  TIM_ClockConfigTypeDef sClockSourceConfig;
+  TIM_MasterConfigTypeDef sMasterConfig;
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 31;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 65000;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+}
+
 
 /**
   * @brief  Period elapsed callback in non blocking mode

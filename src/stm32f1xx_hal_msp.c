@@ -166,24 +166,50 @@ void HAL_RTC_MspInit(RTC_HandleTypeDef* hrtc)
 
 }
 
-void HAL_RTC_MspDeInit(RTC_HandleTypeDef* hrtc)
-{
-
-  if(hrtc->Instance==RTC)
-  {
-  /* USER CODE BEGIN RTC_MspDeInit 0 */
-
-  /* USER CODE END RTC_MspDeInit 0 */
-    /* Peripheral clock disable */
+void HAL_RTC_MspDeInit(RTC_HandleTypeDef* hrtc){
+  if(hrtc->Instance==RTC)  {
     __HAL_RCC_RTC_DISABLE();
-
-    /* RTC interrupt DeInit */
     HAL_NVIC_DisableIRQ(RTC_IRQn);
-  /* USER CODE BEGIN RTC_MspDeInit 1 */
+  }
+}
 
-  /* USER CODE END RTC_MspDeInit 1 */
+void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim_base){
+  if(htim_base->Instance==TIM3)  {
+    __HAL_RCC_TIM3_CLK_ENABLE();
+    HAL_NVIC_SetPriority(TIM3_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(TIM3_IRQn);
+  }else  if(htim_base->Instance==TIM2)  {
+    __HAL_RCC_TIM2_CLK_ENABLE();
+    /* TIM2 interrupt Init */
+    //HAL_NVIC_SetPriority(TIM2_IRQn, 5, 0);
+    //HAL_NVIC_EnableIRQ(TIM2_IRQn);
   }
 
+}
+
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef* htim)
+{
+
+  GPIO_InitTypeDef GPIO_InitStruct;
+  if(htim->Instance==TIM3)  {
+    /**TIM3 GPIO Configuration    
+    PA6     ------> TIM3_CH1 
+    */
+    GPIO_InitStruct.Pin = GPIO_PIN_6;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  }
+}
+
+void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* htim_base){
+  if(htim_base->Instance==TIM2)  {
+    __HAL_RCC_TIM2_CLK_DISABLE();
+    HAL_NVIC_DisableIRQ(TIM2_IRQn);
+  }  else if(htim_base->Instance==TIM3)  {
+    __HAL_RCC_TIM3_CLK_DISABLE();
+    HAL_NVIC_DisableIRQ(TIM3_IRQn);
+  }
 }
 
 void HAL_UART_MspInit(UART_HandleTypeDef* huart)
