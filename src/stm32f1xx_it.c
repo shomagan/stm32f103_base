@@ -175,57 +175,47 @@ void SysTick_Handler(void)
 /**
 * @brief This function handles RTC global interrupt.
 */
-void RTC_IRQHandler(void)
-{
-  /* USER CODE BEGIN RTC_IRQn 0 */
-
-  /* USER CODE END RTC_IRQn 0 */
+void RTC_IRQHandler(void){
   HAL_RTCEx_RTCIRQHandler(&hrtc);
-  /* USER CODE BEGIN RTC_IRQn 1 */
+}
 
-  /* USER CODE END RTC_IRQn 1 */
+/**
+* @brief This function handles USB high priority or CAN TX interrupts.
+*/
+void USB_HP_CAN1_TX_IRQHandler(void){
+  HAL_PCD_IRQHandler(&hpcd_USB_FS);
 }
 
 /**
 * @brief This function handles USB low priority or CAN RX0 interrupts.
 */
-void USB_LP_CAN1_RX0_IRQHandler(void)
-{
-  /* USER CODE BEGIN USB_LP_CAN1_RX0_IRQn 0 */
-
-  /* USER CODE END USB_LP_CAN1_RX0_IRQn 0 */
+void USB_LP_CAN1_RX0_IRQHandler(void){
   HAL_PCD_IRQHandler(&hpcd_USB_FS);
-  /* USER CODE BEGIN USB_LP_CAN1_RX0_IRQn 1 */
-
-  /* USER CODE END USB_LP_CAN1_RX0_IRQn 1 */
+}
+/**
+* @brief This function handles USB wake-up interrupt through EXTI line 18.
+*/
+void USBWakeUp_IRQHandler(void){
+  if ((&hpcd_USB_FS)->Init.low_power_enable) {
+    /* Reset SLEEPDEEP bit of Cortex System Control Register */
+    SCB->SCR &= (uint32_t)~((uint32_t)(SCB_SCR_SLEEPDEEP_Msk | SCB_SCR_SLEEPONEXIT_Msk));
+    SystemClock_Config();
+  }
+  __HAL_USB_WAKEUP_EXTI_CLEAR_FLAG();
 }
 
 /**
 * @brief This function handles TIM1 update interrupt.
 */
-void TIM1_UP_IRQHandler(void)
-{
-  /* USER CODE BEGIN TIM1_UP_IRQn 0 */
-
-  /* USER CODE END TIM1_UP_IRQn 0 */
+void TIM1_UP_IRQHandler(void){
   HAL_TIM_IRQHandler(&htim1);
-  /* USER CODE BEGIN TIM1_UP_IRQn 1 */
-
-  /* USER CODE END TIM1_UP_IRQn 1 */
 }
 
 /**
 * @brief This function handles TIM3 global interrupt.
 */
-void TIM3_IRQHandler(void)
-{
-  /* USER CODE BEGIN TIM3_IRQn 0 */
-
-  /* USER CODE END TIM3_IRQn 0 */
+void TIM3_IRQHandler(void){
   HAL_TIM_IRQHandler(&htim3);
-  /* USER CODE BEGIN TIM3_IRQn 1 */
-
-  /* USER CODE END TIM3_IRQn 1 */
 }
 
 /**

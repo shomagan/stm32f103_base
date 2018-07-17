@@ -20,14 +20,14 @@ file(GLOB FREERTOS_SOURCES_PORTABLE ${FREERTOS_DIR}/portable/GCC/ARM_CM3/*.c)
 
 
 file(GLOB USB_CORE Middlewares/ST/STM32_USB_Device_Library/Core/Src/*.c)
-file(GLOB USB_CLASS_DFU Middlewares/ST/STM32_USB_Device_Library/Class/DFU/Src/*.c)
+file(GLOB USB_CLASS_CDC Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/*.c)
 file(GLOB HAL_SOURCES Drivers/${MCU_FAMILY}_HAL_DRIVER/Src/*.c)
 file(GLOB CMSIS_SYSTEM src/system_${MCU_FAMILY}.c)
 file(GLOB CMSIS_STARTUP Drivers/CMSIS/Device/ST/STM32F1xx/Source/Templates/gcc/startup_stm32f103x6.s)
 file(GLOB LINKER_FILE ${MCU_LINKER_SCRIPT})
 
 set(SOURCE_FILES  ${CMSIS_RTOS} ${FREERTOS_SOURCES} ${FREERTOS_SOURCES_PORTABLE} ${FREERTOS_SOURCES_MEM}
-                  ${USB_CORE} ${USB_CLASS_DFU} ${USER_SOURCES} ${HAL_SOURCES} ${CMSIS_SYSTEM} ${CMSIS_STARTUP} ${LINKER_FILE})
+                  ${USB_CORE} ${USB_CLASS_CDC} ${USER_SOURCES} ${HAL_SOURCES} ${CMSIS_SYSTEM} ${CMSIS_STARTUP} ${LINKER_FILE})
 
 include_directories(Drivers/CMSIS/Device/ST/${MCU_FAMILY}/Include)
 include_directories(Drivers/CMSIS/Include)
@@ -42,7 +42,7 @@ include_directories(inc/freertos/common)
 include_directories(inc/freertos/test)
 include_directories(inc/freertos/portable)
 include_directories(Middlewares/ST/STM32_USB_Device_Library/Core/Inc)
-include_directories(Middlewares/ST/STM32_USB_Device_Library/Class/DFU/Inc)
+include_directories(Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc)
 
 
 

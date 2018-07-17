@@ -119,9 +119,9 @@ int main(void){
   MX_TIM3_Init();
   MX_TIM2_Init();
 
-  osThreadDef(own_task, default_task, osPriorityNormal, 0, 128);
+  osThreadDef(own_task, default_task, osPriorityNormal, 0, 512);
   defaultTaskHandle = osThreadCreate(osThread(own_task), NULL);
-  osThreadDef(ds18_task, ds18_task, osPriorityHigh, 0, 128);
+  osThreadDef(ds18_task, ds18_task, osPriorityHigh, 0, 256);
   defaultTaskHandle = osThreadCreate(osThread(ds18_task), NULL);
   /* Start scheduler */
   osKernelStart();
@@ -417,16 +417,25 @@ static void MX_GPIO_Init(void)
 /* USER CODE END 4 */
 
 /* StartDefaultTask function */
-void default_task(void const * argument)
-{
+void default_task(void const * argument){
   /* init code for USB_DEVICE */
+  TickType_t time;
   MX_USB_DEVICE_Init();
+  while(1)  {
+    for (char i=0;i<_DS18B20_MAX_SENSORS;i++){
+      if(ds18b20[i].DataIsValid){
+          char temp_buff[32];
+          char len;
+          time = osKernelSysTick();
+          len = sprintf(temp_buff,"temp - %lu:%f",time,ds18b20[i].Temperature);
+          CDC_Transmit_FS(temp_buff, len);
+          time = osKernelSysTick();
+          while (osKernelSysTick()>(time+10)){
 
-  /* USER CODE BEGIN 5 */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
+          }
+      }
+    }
+    osDelay(1000);
   }
   /* USER CODE END 5 */ 
 }
