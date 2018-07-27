@@ -41,7 +41,7 @@ void ONEWIRE_OUTPUT(OneWire_t *gp);
 #define ONEWIRE_CMD_SKIPROM				0xCC
 
 //#######################################################################################################
-void OneWire_Init(OneWire_t* OneWireStruct, GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin);
+void one_wire_init(OneWire_t* OneWireStruct, GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin);
 uint8_t OneWire_Reset(OneWire_t* OneWireStruct);
 uint8_t OneWire_ReadByte(OneWire_t* OneWireStruct);
 void OneWire_WriteByte(OneWire_t* OneWireStruct, uint8_t byte);
@@ -49,9 +49,9 @@ void OneWire_WriteBit(OneWire_t* OneWireStruct, uint8_t bit);
 uint8_t OneWire_ReadBit(OneWire_t* OneWireStruct);
 uint8_t OneWire_Search(OneWire_t* OneWireStruct, uint8_t command);
 void OneWire_ResetSearch(OneWire_t* OneWireStruct);
-uint8_t OneWire_First(OneWire_t* OneWireStruct);
-uint8_t OneWire_Next(OneWire_t* OneWireStruct);
-void OneWire_GetFullROM(OneWire_t* OneWireStruct, uint8_t *firstIndex);
+uint8_t one_wire_first(OneWire_t* OneWireStruct);
+uint8_t one_wire_next(OneWire_t* OneWireStruct);
+void one_wire_get_full_rom(OneWire_t* OneWireStruct, uint8_t *firstIndex);
 void OneWire_Select(OneWire_t* OneWireStruct, uint8_t* addr);
 void OneWire_SelectWithPointer(OneWire_t* OneWireStruct, uint8_t* ROM);
 uint8_t OneWire_CRC8(uint8_t* addr, uint8_t len);

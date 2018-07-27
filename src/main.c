@@ -52,29 +52,20 @@
 #include "cmsis_os.h"
 #include "usb_device.h"
 #include "ds18.h"
+#include "control.h"
+#include "usbd_cdc_if.h"
 
-/* USER CODE BEGIN Includes */
 
-/* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
-
 IWDG_HandleTypeDef hiwdg;
-
 RTC_HandleTypeDef hrtc;
-
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
-
 UART_HandleTypeDef huart1;
-
 osThreadId defaultTaskHandle;
 
-/* USER CODE BEGIN PV */
-/* Private variables ---------------------------------------------------------*/
-
-/* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -89,16 +80,6 @@ void default_task(void const * argument);
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
                                 
-                                
-
-/* USER CODE BEGIN PFP */
-/* Private function prototypes -----------------------------------------------*/
-
-/* USER CODE END PFP */
-
-/* USER CODE BEGIN 0 */
-
-/* USER CODE END 0 */
 
 /**
   * @brief  The application entry point.
@@ -111,18 +92,20 @@ int main(void){
   SystemClock_Config();
 
   MX_GPIO_Init();
-  //MX_IWDG_Init();
+  MX_IWDG_Init();
   MX_RTC_Init();
-  MX_ADC1_Init();
+  //MX_ADC1_Init();
   MX_USART1_UART_Init();
-
   MX_TIM3_Init();
   MX_TIM2_Init();
 
   osThreadDef(own_task, default_task, osPriorityNormal, 0, 512);
   defaultTaskHandle = osThreadCreate(osThread(own_task), NULL);
-  osThreadDef(ds18_task, ds18_task, osPriorityHigh, 0, 256);
+  osThreadDef(ds18_task, ds18_task, osPriorityHigh, 0, 320);
   defaultTaskHandle = osThreadCreate(osThread(ds18_task), NULL);
+  osThreadDef(control_task, control_task, osPriorityNormal, 0, 320);
+  defaultTaskHandle = osThreadCreate(osThread(control_task), NULL);
+
   /* Start scheduler */
   osKernelStart();
   
@@ -272,7 +255,7 @@ static void MX_IWDG_Init(void)
 {
 
   hiwdg.Instance = IWDG;
-  hiwdg.Init.Prescaler = IWDG_PRESCALER_4;
+  hiwdg.Init.Prescaler = IWDG_PRESCALER_256;
   hiwdg.Init.Reload = 4095;
   if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
   {
@@ -282,8 +265,7 @@ static void MX_IWDG_Init(void)
 }
 
 /* RTC init function */
-static void MX_RTC_Init(void)
-{
+static void MX_RTC_Init(void){
 
   /* USER CODE BEGIN RTC_Init 0 */
 
@@ -301,8 +283,7 @@ static void MX_RTC_Init(void)
   hrtc.Instance = RTC;
   hrtc.Init.AsynchPrediv = RTC_AUTO_1_SECOND;
   hrtc.Init.OutPut = RTC_OUTPUTSOURCE_ALARM;
-  if (HAL_RTC_Init(&hrtc) != HAL_OK)
-  {
+  if (HAL_RTC_Init(&hrtc) != HAL_OK) {
     _Error_Handler(__FILE__, __LINE__);
   }
   /* USER CODE BEGIN RTC_Init 2 */
@@ -315,8 +296,7 @@ static void MX_RTC_Init(void)
   sTime.Minutes = 0;
   sTime.Seconds = 0;
 
-  if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
-  {
+  if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK) {
     _Error_Handler(__FILE__, __LINE__);
   }
   /* USER CODE BEGIN RTC_Init 3 */
@@ -328,13 +308,10 @@ static void MX_RTC_Init(void)
   DateToUpdate.Date = 1;
   DateToUpdate.Year = 18;
 
-  if (HAL_RTC_SetDate(&hrtc, &DateToUpdate, RTC_FORMAT_BIN) != HAL_OK)
-  {
+  if (HAL_RTC_SetDate(&hrtc, &DateToUpdate, RTC_FORMAT_BIN) != HAL_OK) {
     _Error_Handler(__FILE__, __LINE__);
   }
-  /* USER CODE BEGIN RTC_Init 4 */
 
-  /* USER CODE END RTC_Init 4 */
 
 }
 
@@ -342,12 +319,12 @@ static void MX_RTC_Init(void)
 static void MX_TIM3_Init(void){
   TIM_ClockConfigTypeDef sClockSourceConfig;
   TIM_MasterConfigTypeDef sMasterConfig;
-  TIM_OC_InitTypeDef sConfigOC;
+  TIM_OC_InitTypeDef pwm_handle;
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 65535;
-  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV2;
+  htim3.Init.Period = 32768;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)  {
     _Error_Handler(__FILE__, __LINE__);
@@ -364,11 +341,11 @@ static void MX_TIM3_Init(void){
   if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)  {
     _Error_Handler(__FILE__, __LINE__);
   }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 32768;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)  {
+  pwm_handle.OCMode = TIM_OCMODE_PWM1;
+  pwm_handle.Pulse = 16000;
+  pwm_handle.OCPolarity = TIM_OCPOLARITY_HIGH;
+  pwm_handle.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim3, &pwm_handle, TIM_CHANNEL_1) != HAL_OK)  {
     _Error_Handler(__FILE__, __LINE__);
   }
   HAL_TIM_MspPostInit(&htim3);
@@ -420,21 +397,23 @@ static void MX_GPIO_Init(void)
 void default_task(void const * argument){
   /* init code for USB_DEVICE */
   TickType_t time;
-  MX_USB_DEVICE_Init();
+  //MX_USB_DEVICE_Init();
+  HAL_IWDG_Refresh(&hiwdg);
   while(1)  {
     for (char i=0;i<_DS18B20_MAX_SENSORS;i++){
-      if(ds18b20[i].DataIsValid){
+      if(ds18b20[i].data_validate){
           char temp_buff[32];
           char len;
           time = osKernelSysTick();
           len = sprintf(temp_buff,"temp - %lu:%f",time,ds18b20[i].Temperature);
-          CDC_Transmit_FS(temp_buff, len);
+         // CDC_Transmit_FS(temp_buff, len);
           time = osKernelSysTick();
           while (osKernelSysTick()>(time+10)){
 
           }
       }
     }
+    HAL_IWDG_Refresh(&hiwdg);
     osDelay(1000);
   }
   /* USER CODE END 5 */ 
@@ -444,7 +423,7 @@ static void MX_TIM2_Init(void){
   TIM_ClockConfigTypeDef sClockSourceConfig;
   TIM_MasterConfigTypeDef sMasterConfig;
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 31;
+  htim2.Init.Prescaler = 71;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim2.Init.Period = 65000;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;

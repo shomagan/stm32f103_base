@@ -9,8 +9,8 @@
 #define	_DS18B20_PIN												GPIO_PIN_15
 
 
-#define	_DS18B20_UPDATE_INTERVAL_MS					10000					//  (((	if==0  >> Ds18b20_ManualConvert()  )))    ((( if>0  >>>> Auto refresh )))
-#define	_DS18B20_CONVERT_TIMEOUT_MS					5000		
+#define	_DS18B20_UPDATE_INTERVAL_MS					1000					//  (((	if==0  >> Ds18b20_ManualConvert()  )))    ((( if>0  >>>> Auto refresh )))
+#define	_DS18B20_CONVERT_TIMEOUT_MS					1000
 
 #define	_DS18B20_TIMER											htim2						
 //###################################################################################

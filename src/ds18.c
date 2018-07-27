@@ -46,89 +46,100 @@
 #include "semphr.h"
 #include "cmsis_os.h"
 #include "usbd_cdc_if.h"
+extern IWDG_HandleTypeDef hiwdg;
 Ds18b20Sensor_t	ds18b20[_DS18B20_MAX_SENSORS];
 
-OneWire_t OneWire;
-uint8_t	  OneWireDevices;
-uint8_t 	TempSensorCount=0;
-uint8_t		Ds18b20StartConvert=0;
-uint16_t	Ds18b20Timeout=0;
-osThreadId 	Ds18b20Handle;
+static OneWire_t one_wire;
+static uint8_t	  one_wire_devices;
 
+static uint8_t		ds18b20_start_converter=0;
+static uint16_t	ds18b20_timeout=0;
+static osThreadId 	Ds18b20Handle;
+#define MAX_ERROR_READ_COUNTER 10
+static uint8_t error_read_counter = 0;
+static uint8_t find_device(void);
+uint8_t 	temp_sensor_count=0;
+uint8_t data_valid =0;
 void ds18_task( const void *parameters){
-	uint8_t	Ds18b20TryToFind=5;
     TickType_t ds18_time;
     (void)parameters;
     ds18_time = xTaskGetTickCount();
-	do	{
-		OneWire_Init(&OneWire,_DS18B20_GPIO ,_DS18B20_PIN);
-		TempSensorCount = 0;	
-		while(HAL_GetTick() < 3000){
-			osDelay(100);
-        }
-		OneWireDevices = OneWire_First(&OneWire);
-		while (OneWireDevices){
-			osDelay(100);
-			TempSensorCount++;
-			OneWire_GetFullROM(&OneWire, ds18b20[TempSensorCount-1].Address);
-			OneWireDevices = OneWire_Next(&OneWire);
-		}
-		if(TempSensorCount>0){
-			break;
-        }
-		Ds18b20TryToFind--;
-	}while(Ds18b20TryToFind>0);
-	if(Ds18b20TryToFind==0){
-		vTaskDelete(Ds18b20Handle);
-    }
-	for (uint8_t i = 0; i < TempSensorCount; i++){
-		osDelay(50);
-        DS18B20_SetResolution(&OneWire, ds18b20[i].Address, DS18B20_Resolution_12bits);
-		osDelay(50);
-        DS18B20_DisableAlarmTemperature(&OneWire,  ds18b20[i].Address);
-    }
+    //infinity find device
+    find_device();
+    error_read_counter = 0;
     while(1){
-		while(_DS18B20_UPDATE_INTERVAL_MS==0){
-			if(Ds18b20StartConvert==1){
-				break;}
-			osDelay(10);	
-		}
-		Ds18b20Timeout=_DS18B20_CONVERT_TIMEOUT_MS/10;
-		DS18B20_StartAll(&OneWire);
-		osDelay(100);
-        while (!DS18B20_AllDone(&OneWire)){
-			osDelay(10);  
-			Ds18b20Timeout-=1;
-			if(Ds18b20Timeout==0)
+        if(error_read_counter >= MAX_ERROR_READ_COUNTER ){
+            find_device();
+            error_read_counter = 0;
+            data_valid = 0;
+        }
+        ds18b20_timeout=_DS18B20_CONVERT_TIMEOUT_MS;
+        ds18b20_start_calc(&one_wire);
+        while (!ds18b20_calc_done(&one_wire)){
+            osDelay(1);
+            ds18b20_timeout-=1;
+            if(ds18b20_timeout==0)
 				break;
 		}	
-		if(Ds18b20Timeout>0){
-			for (uint8_t i = 0; i < TempSensorCount; i++){
-				osDelay(1000);
-				ds18b20[i].DataIsValid = DS18B20_Read(&OneWire, ds18b20[i].Address, &ds18b20[i].Temperature);
+        if(ds18b20_timeout>0){
+            for (uint8_t i = 0; i < temp_sensor_count; i++){
+                ds18b20[i].data_validate = ds18b20_read(&one_wire, ds18b20[i].Address, &ds18b20[i].Temperature);
+                if(!ds18b20[i].data_validate){
+                    error_read_counter++;
+                }else{
+                    error_read_counter=0;
+                    data_valid = 1;
+                }
 			}
 		}else{
-			for (uint8_t i = 0; i < TempSensorCount; i++){
-				ds18b20[i].DataIsValid = false;}
+            error_read_counter++;
+            for (uint8_t i = 0; i < temp_sensor_count; i++){
+                ds18b20[i].data_validate = false;
+            }
 		}
-		Ds18b20StartConvert=0;
-        //ds18_time = osKernelSysTick();
+        ds18b20_start_converter=0;
+        HAL_IWDG_Refresh(&hiwdg);
         osDelay(_DS18B20_UPDATE_INTERVAL_MS);
-        //osDelayUntil(&ds18_time,_DS18B20_UPDATE_INTERVAL_MS);
 	}
 }
- 
+/*@brief infinity cycle while did't find device
+ *
+ * */
+static uint8_t find_device(){
+    do	{
+        one_wire_init(&one_wire,_DS18B20_GPIO ,_DS18B20_PIN);
+        temp_sensor_count = 0;
+        while(HAL_GetTick() < 3000){
+            osDelay(100);
+        }
+        one_wire_devices = one_wire_first(&one_wire);
+        while (one_wire_devices){
+            osDelay(100);
+            temp_sensor_count++;
+            one_wire_get_full_rom(&one_wire, ds18b20[temp_sensor_count-1].Address);
+            one_wire_devices = one_wire_next(&one_wire);
+        }
+        if(temp_sensor_count>0){
+            break;
+        }
+        HAL_IWDG_Refresh(&hiwdg);
+    }while(temp_sensor_count==0);
+    for (uint8_t i = 0; i < temp_sensor_count; i++){
+        osDelay(50);
+        ds18b20_set_resolution(&one_wire, ds18b20[i].Address, DS18B20_Resolution_10bits);
+        osDelay(50);
+        ds18b20_disable_alarm_temperature(&one_wire,  ds18b20[i].Address);
+    }
 
-//###################################################################################
-void Task_Ds18b20(void const * argument);
+    return temp_sensor_count;
+}
 
-//###########################################################################################
 //###########################################################################################
 bool	Ds18b20_ManualConvert(void){
-	Ds18b20StartConvert=1;
-	while(Ds18b20StartConvert==1)
+    ds18b20_start_converter=1;
+    while(ds18b20_start_converter==1)
 		osDelay(10);
-	if(Ds18b20Timeout==0)
+    if(ds18b20_timeout==0)
 		return false;
 	else
 		return true;	
@@ -151,7 +162,7 @@ uint8_t DS18B20_Start(OneWire_t* OneWire, uint8_t *ROM){
 	return 1;
 }
 
-void DS18B20_StartAll(OneWire_t* OneWire){
+void ds18b20_start_calc(OneWire_t* OneWire){
 	/* Reset pulse */
 	OneWire_Reset(OneWire);
 	/* Skip rom */
@@ -160,7 +171,7 @@ void DS18B20_StartAll(OneWire_t* OneWire){
 	OneWire_WriteByte(OneWire, DS18B20_CMD_CONVERTTEMP);
 }
 
-bool DS18B20_Read(OneWire_t* OneWire, uint8_t *ROM, float *destination) {
+bool ds18b20_read(OneWire_t* OneWire, uint8_t *ROM, float *destination) {
 	uint16_t temperature;
 	uint8_t resolution;
 	int8_t digit, minus = 0;
@@ -169,12 +180,15 @@ bool DS18B20_Read(OneWire_t* OneWire, uint8_t *ROM, float *destination) {
 	uint8_t data[9];
 	uint8_t crc;
 	/* Check if device is DS18B20 */
+    taskENTER_CRITICAL();
 	if (!DS18B20_Is(ROM)) {
+        taskEXIT_CRITICAL();
 		return false;
 	}
 	/* Check if line is released, if it is, then conversion is complete */
 	if (!OneWire_ReadBit(OneWire)) 	{
 		/* Conversion is not finished yet */
+        taskEXIT_CRITICAL();
 		return false; 
 	}
 	/* Reset line */
@@ -194,10 +208,13 @@ bool DS18B20_Read(OneWire_t* OneWire, uint8_t *ROM, float *destination) {
 	/* Check if CRC is ok */
 	if (crc != data[8]){
 		/* CRC invalid */
+        taskEXIT_CRITICAL();
 		return 0;}
+    taskEXIT_CRITICAL();
 	/* First two bytes of scratchpad are temperature values */
 	temperature = data[0] | (data[1] << 8);
 	/* Reset line */
+
 	OneWire_Reset(OneWire);
 	/* Check if temperature is negative */
 	if (temperature & 0x8000){
@@ -263,7 +280,7 @@ uint8_t DS18B20_GetResolution(OneWire_t* OneWire, uint8_t *ROM){
 	return ((conf & 0x60) >> 5) + 9;
 }
 
-uint8_t DS18B20_SetResolution(OneWire_t* OneWire, uint8_t *ROM, DS18B20_Resolution_t resolution) {
+uint8_t ds18b20_set_resolution(OneWire_t* OneWire, uint8_t *ROM, DS18B20_Resolution_t resolution) {
 	uint8_t th, tl, conf;
 	if (!DS18B20_Is(ROM)) {
 		return 0;}
@@ -403,7 +420,7 @@ uint8_t DS18B20_SetAlarmHighTemperature(OneWire_t* OneWire, uint8_t *ROM, int8_t
 	return 1;
 }
 
-uint8_t DS18B20_DisableAlarmTemperature(OneWire_t* OneWire, uint8_t *ROM) {
+uint8_t ds18b20_disable_alarm_temperature(OneWire_t* OneWire, uint8_t *ROM) {
 	uint8_t tl, th, conf;
 	if (!DS18B20_Is(ROM)) {
 		return 0;
@@ -446,7 +463,7 @@ uint8_t DS18B20_AlarmSearch(OneWire_t* OneWire){
 	return OneWire_Search(OneWire, DS18B20_CMD_ALARMSEARCH);
 }
 
-uint8_t DS18B20_AllDone(OneWire_t* OneWire){
+uint8_t ds18b20_calc_done(OneWire_t* OneWire){
 	/* If read bit is low, then device is not finished yet with calculation temperature */
 	return OneWire_ReadBit(OneWire);
 }

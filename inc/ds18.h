@@ -57,12 +57,13 @@ void ds18_task( const void *parameters);
 typedef struct{
 	uint8_t 	Address[8];
 	float 		Temperature;
-	bool			DataIsValid;	
+	bool			data_validate;	
 }Ds18b20Sensor_t;
 //###################################################################################
 
 extern Ds18b20Sensor_t	ds18b20[_DS18B20_MAX_SENSORS];
-
+extern uint8_t 	temp_sensor_count;
+extern uint8_t data_valid;
 //###################################################################################
 /* Every onewire chip has different ROM code, but all the same chips has same family code */
 /* in case of DS18B20 this is 0x28 and this is first byte of ROM address */
@@ -99,16 +100,16 @@ typedef enum {
 bool			Ds18b20_ManualConvert(void);
 //###################################################################################
 uint8_t 	DS18B20_Start(OneWire_t* OneWireStruct, uint8_t* ROM);
-void 			DS18B20_StartAll(OneWire_t* OneWireStruct);
-bool		 	DS18B20_Read(OneWire_t* OneWireStruct, uint8_t* ROM, float* destination);
+void 			ds18b20_start_calc(OneWire_t* OneWireStruct);
+bool		 	ds18b20_read(OneWire_t* OneWireStruct, uint8_t* ROM, float* destination);
 uint8_t 	DS18B20_GetResolution(OneWire_t* OneWireStruct, uint8_t* ROM);
-uint8_t 	DS18B20_SetResolution(OneWire_t* OneWireStruct, uint8_t* ROM, DS18B20_Resolution_t resolution);
+uint8_t 	ds18b20_set_resolution(OneWire_t* OneWireStruct, uint8_t* ROM, DS18B20_Resolution_t resolution);
 uint8_t 	DS18B20_Is(uint8_t* ROM);
 uint8_t 	DS18B20_SetAlarmHighTemperature(OneWire_t* OneWireStruct, uint8_t* ROM, int8_t temp);
 uint8_t 	DS18B20_SetAlarmLowTemperature(OneWire_t* OneWireStruct, uint8_t* ROM, int8_t temp);
-uint8_t 	DS18B20_DisableAlarmTemperature(OneWire_t* OneWireStruct, uint8_t* ROM);
+uint8_t 	ds18b20_disable_alarm_temperature(OneWire_t* OneWireStruct, uint8_t* ROM);
 uint8_t 	DS18B20_AlarmSearch(OneWire_t* OneWireStruct);
-uint8_t 	DS18B20_AllDone(OneWire_t* OneWireStruct);
+uint8_t 	ds18b20_calc_done(OneWire_t* OneWireStruct);
 //###################################################################################
 
 /*add functions and variable declarations before */

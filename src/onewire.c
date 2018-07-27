@@ -52,7 +52,7 @@ void ONEWIRE_OUTPUT(OneWire_t *gp)
 	HAL_GPIO_Init(gp->GPIOx,&gpinit);
 
 }
-void OneWire_Init(OneWire_t* OneWireStruct, GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin) 
+void one_wire_init(OneWire_t* OneWireStruct, GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin) 
 {	
 	HAL_TIM_Base_Start(&_DS18B20_TIMER);
 
@@ -165,7 +165,7 @@ uint8_t OneWire_ReadByte(OneWire_t* OneWireStruct) {
 	return byte;
 }
 
-uint8_t OneWire_First(OneWire_t* OneWireStruct) {
+uint8_t one_wire_first(OneWire_t* OneWireStruct) {
 	/* Reset search values */
 	OneWire_ResetSearch(OneWireStruct);
 
@@ -173,7 +173,7 @@ uint8_t OneWire_First(OneWire_t* OneWireStruct) {
 	return OneWire_Search(OneWireStruct, ONEWIRE_CMD_SEARCHROM);
 }
 
-uint8_t OneWire_Next(OneWire_t* OneWireStruct) {
+uint8_t one_wire_next(OneWire_t* OneWireStruct) {
    /* Leave the search state alone */
    return OneWire_Search(OneWireStruct, ONEWIRE_CMD_SEARCHROM);
 }
@@ -385,7 +385,7 @@ void OneWire_SelectWithPointer(OneWire_t* OneWireStruct, uint8_t *ROM) {
 	}	
 }
 
-void OneWire_GetFullROM(OneWire_t* OneWireStruct, uint8_t *firstIndex) {
+void one_wire_get_full_rom(OneWire_t* OneWireStruct, uint8_t *firstIndex) {
 	uint8_t i;
 	for (i = 0; i < 8; i++) {
 		*(firstIndex + i) = OneWireStruct->ROM_NO[i];
