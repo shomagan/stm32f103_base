@@ -50,10 +50,10 @@
 #include "main.h"
 #include "stm32f1xx_hal.h"
 #include "cmsis_os.h"
-#include "usb_device.h"
+//#include "usb_device.h"
 #include "ds18.h"
 #include "control.h"
-#include "usbd_cdc_if.h"
+//#include "usbd_cdc_if.h"
 
 
 
@@ -323,7 +323,7 @@ static void MX_TIM3_Init(void){
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 32768;
+  htim3.Init.Period = MAX_PWM_VALUE;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)  {

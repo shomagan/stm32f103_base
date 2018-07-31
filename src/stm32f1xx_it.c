@@ -181,25 +181,25 @@ void RTC_IRQHandler(void){
 * @brief This function handles USB high priority or CAN TX interrupts.
 */
 void USB_HP_CAN1_TX_IRQHandler(void){
-  HAL_PCD_IRQHandler(&hpcd_USB_FS);
+  //HAL_PCD_IRQHandler(&hpcd_USB_FS);
 }
 
 /**
 * @brief This function handles USB low priority or CAN RX0 interrupts.
 */
 void USB_LP_CAN1_RX0_IRQHandler(void){
-  HAL_PCD_IRQHandler(&hpcd_USB_FS);
+  //HAL_PCD_IRQHandler(&hpcd_USB_FS);
 }
 /**
 * @brief This function handles USB wake-up interrupt through EXTI line 18.
 */
 void USBWakeUp_IRQHandler(void){
-  if ((&hpcd_USB_FS)->Init.low_power_enable) {
-    /* Reset SLEEPDEEP bit of Cortex System Control Register */
+/*  if ((&hpcd_USB_FS)->Init.low_power_enable) {
+
     SCB->SCR &= (uint32_t)~((uint32_t)(SCB_SCR_SLEEPDEEP_Msk | SCB_SCR_SLEEPONEXIT_Msk));
     SystemClock_Config();
   }
-  __HAL_USB_WAKEUP_EXTI_CLEAR_FLAG();
+  __HAL_USB_WAKEUP_EXTI_CLEAR_FLAG();*/
 }
 
 /**

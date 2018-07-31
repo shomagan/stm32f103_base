@@ -45,8 +45,9 @@
 #include "task.h"
 #include "semphr.h"
 #include "cmsis_os.h"
-#include "usbd_cdc_if.h"
+//#include "usbd_cdc_if.h"
 #include "ds18.h"
+#include "ssd1306.h"
 extern IWDG_HandleTypeDef hiwdg;
 /* ФБ "ПИД" */
 typedef union DataTypes_union{
@@ -94,7 +95,7 @@ void fb00099_exec(fb00099_IN_type * FBInputs,fb00099_VAR_type * FBVars,\
                   fb00099_OUT_type * FBOutputs);
 
 #define DEFAULT_OUT 0.0f
-#define REQUIRE_VALUE 18.0f
+#define REQUIRE_VALUE 15.0f
 static void set_pwm_value(float value);
 void control_task( const void *parameters){
     TickType_t control_time;
@@ -111,12 +112,20 @@ void control_task( const void *parameters){
     in.rezet.data.bit = 0;			// bit 1- сброс накопленных параметров
     in.require_value.data.float32 = REQUIRE_VALUE; 		// float Уставка регулирования
     in.current_value.data.float32 = REQUIRE_VALUE;			// float Регулируемый параметр
-    in.kp.data.float32 = 1.0f;		 		// float Коэффициент пропорциональности
-    in.ki.data.float32 = 0.5;		  		// float Коэффициент времени интегрирования
-    in.kd.data.float32 = 0.4;				// float Коэффициент времени интегрирования
+    in.kp.data.float32 = 75.0f;		 		// float Коэффициент пропорциональности
+    in.ki.data.float32 = 9.0f;		  		// float Коэффициент времени интегрирования
+    in.kd.data.float32 = -100.0f;				// float Коэффициент времени интегрирования
     in.position.data.float32 = DEFAULT_OUT;	    	// float - необходимое положение регулятора в процентах
     in.gist_tube.data.float32 = 0.5f;	 		// float Зона нечувствительности в единицах измеряемого параметра
-
+    taskENTER_CRITICAL();
+    HAL_IWDG_Refresh(&hiwdg);
+    SSD1306_Init();
+    HAL_IWDG_Refresh(&hiwdg);
+    SSD1306_GotoXY(0, 44); //Устанавливаем курсор в позицию 0;44. Сначала по горизонтали, потом вертикали.
+    SSD1306_Puts("refregerator", &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+    SSD1306_DrawCircle(10, 33, 7, SSD1306_COLOR_WHITE); //рисуем белую окружность в позиции 10;33 и радиусом 7 пикселей
+    SSD1306_UpdateScreen();
+    taskEXIT_CRITICAL();
     while(1){
         //ds18_time = osKernelSysTick();
         u8 sensor_data_valid;
@@ -131,11 +140,27 @@ void control_task( const void *parameters){
         fb00099_exec(&in,&var,&out);
         if(data_valid) {
             static float value;
+            char buff[32];
             value = out.output.data.float32 >= 0.0f?out.output.data.float32:0.0f;
-            value = out.output.data.float32 <= 60.0f?out.output.data.float32:60.0f;
+            value = value <= 75.0f?value:75.0f;
             set_pwm_value(value);
             in.position.data.float32 = out.output.data.float32;
+            SSD1306_Fill(SSD1306_COLOR_BLACK);
+            SSD1306_GotoXY(0, 22); //Устанавливаем курсор в позицию 0;44. Сначала по горизонтали, потом вертикали.
+            sprintf(buff,"temperature %f",in.current_value.data.float32);
+            SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+            SSD1306_GotoXY(0, 44); //Устанавливаем курсор в позицию 0;44. Сначала по горизонтали, потом вертикали.
+            sprintf(buff,"pwm %f",value);
+            SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+            SSD1306_UpdateScreen();
+
         }else{
+            char buff[32];
+            sprintf(buff,"temperature off");
+            SSD1306_Fill(SSD1306_COLOR_BLACK);
+            SSD1306_GotoXY(0, 44); //Устанавливаем курсор в позицию 0;44. Сначала по горизонтали, потом вертикали.
+            SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+            SSD1306_UpdateScreen();
             set_pwm_value(DEFAULT_OUT);
             in.position.data.float32 = DEFAULT_OUT;	    	// float - необходимое положение регулятора в процентах
         }
@@ -174,7 +199,7 @@ void set_pwm_value(float value){
     }
 }
 
-#define IntegralAccum 2
+#define IntegralAccum -25
 void fb00099_exec(fb00099_IN_type * FBInputs,fb00099_VAR_type * FBVars,\
                   fb00099_OUT_type * FBOutputs) {
     fb00099_IN_type *IN =  FBInputs;

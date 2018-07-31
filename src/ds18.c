@@ -45,7 +45,7 @@
 #include "task.h"
 #include "semphr.h"
 #include "cmsis_os.h"
-#include "usbd_cdc_if.h"
+//#include "usbd_cdc_if.h"
 extern IWDG_HandleTypeDef hiwdg;
 Ds18b20Sensor_t	ds18b20[_DS18B20_MAX_SENSORS];
 
@@ -126,7 +126,7 @@ static uint8_t find_device(){
     }while(temp_sensor_count==0);
     for (uint8_t i = 0; i < temp_sensor_count; i++){
         osDelay(50);
-        ds18b20_set_resolution(&one_wire, ds18b20[i].Address, DS18B20_Resolution_10bits);
+        ds18b20_set_resolution(&one_wire, ds18b20[i].Address, DS18B20_Resolution_12bits);
         osDelay(50);
         ds18b20_disable_alarm_temperature(&one_wire,  ds18b20[i].Address);
     }

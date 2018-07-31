@@ -139,7 +139,8 @@ uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
   * @{
   */
 
-extern USBD_HandleTypeDef hUsbDeviceFS;
+
+extern USBD_HandleTypeDef USBD_Device;
 
 /* USER CODE BEGIN EXPORTED_VARIABLES */
 
@@ -184,8 +185,8 @@ static int8_t CDC_Init_FS(void)
 {
   /* USER CODE BEGIN 3 */
   /* Set Application Buffers */
-  USBD_CDC_SetTxBuffer(&hUsbDeviceFS, UserTxBufferFS, 0);
-  USBD_CDC_SetRxBuffer(&hUsbDeviceFS, UserRxBufferFS);
+  USBD_CDC_SetTxBuffer(&USBD_Device, UserTxBufferFS, 0);
+  USBD_CDC_SetRxBuffer(&USBD_Device, UserRxBufferFS);
   return (USBD_OK);
   /* USER CODE END 3 */
 }
@@ -290,10 +291,10 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
   */
 static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len){
   unsigned long len;
-  USBD_CDC_SetRxBuffer(&hUsbDeviceFS, Buf);
-  len = USBD_LL_GetRxDataSize(&hUsbDeviceFS,CDC_IN_EP);
+  USBD_CDC_SetRxBuffer(&USBD_Device, Buf);
+  len = USBD_LL_GetRxDataSize(&USBD_Device,CDC_IN_EP);
   if(len){
-      USBD_CDC_ReceivePacket(&hUsbDeviceFS);
+      USBD_CDC_ReceivePacket(&USBD_Device);
   }
   *Len = len;
   return (USBD_OK);
@@ -312,7 +313,7 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len){
   */
 uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len){
   uint8_t result = USBD_OK;
-  USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceFS.pClassData;
+  USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)USBD_Device.pClassData;
   if (hcdc->TxState != 0){
     return USBD_BUSY;
   }
@@ -320,8 +321,8 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len){
   for (char i=0;i<Len;i++){
       UserTxBufferFS[i] = Buf[i];
   }
-  USBD_CDC_SetTxBuffer(&hUsbDeviceFS, UserTxBufferFS, Len);
-  result = USBD_CDC_TransmitPacket(&hUsbDeviceFS);
+  USBD_CDC_SetTxBuffer(&USBD_Device, UserTxBufferFS, Len);
+  result = USBD_CDC_TransmitPacket(&USBD_Device);
   return result;
 }
 

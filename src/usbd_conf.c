@@ -54,36 +54,12 @@
 #include "usbd_core.h"
 #include "usbd_cdc.h"
 
-/* USER CODE BEGIN Includes */
-
-/* USER CODE END Includes */
-
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 
-/* USER CODE BEGIN PV */
-/* Private variables ---------------------------------------------------------*/
-
-/* USER CODE END PV */
-
                 PCD_HandleTypeDef hpcd_USB_FS;
 void _Error_Handler(char * file, int line);
-
-/* USER CODE BEGIN 0 */
-
-/* USER CODE END 0 */
-
-/* USER CODE BEGIN PFP */
-/* Private function prototypes -----------------------------------------------*/
-
-/* USER CODE END PFP */
-
-/* Private functions ---------------------------------------------------------*/
-
-/* USER CODE BEGIN 1 */
-
-/* USER CODE END 1 */
 
 void HAL_PCDEx_SetConnectionState(PCD_HandleTypeDef *hpcd, uint8_t state);
 
@@ -116,10 +92,8 @@ void HAL_PCD_MspInit(PCD_HandleTypeDef* pcdHandle)
       HAL_NVIC_SetPriority(USBWakeUp_IRQn, 5, 0);
       HAL_NVIC_EnableIRQ(USBWakeUp_IRQn);
     }
-  /* USER CODE BEGIN USB_MspInit 1 */
-
-  /* USER CODE END USB_MspInit 1 */
-  }
+ 
+}
 }
 
 void HAL_PCD_MspDeInit(PCD_HandleTypeDef* pcdHandle)
@@ -306,11 +280,11 @@ USBD_StatusTypeDef USBD_LL_Init(USBD_HandleTypeDef *pdev)
   pdev->pData = &hpcd_USB_FS;
 
   hpcd_USB_FS.Instance = USB;
-  hpcd_USB_FS.Init.dev_endpoints = 8;
+  hpcd_USB_FS.Init.dev_endpoints = 4;
   hpcd_USB_FS.Init.speed = PCD_SPEED_FULL;
-  hpcd_USB_FS.Init.ep0_mps = DEP0CTL_MPS_32;
-  hpcd_USB_FS.Init.low_power_enable = ENABLE;
-  hpcd_USB_FS.Init.lpm_enable = ENABLE;
+  hpcd_USB_FS.Init.ep0_mps = 0x40;
+  hpcd_USB_FS.Init.low_power_enable = DISABLE;
+  hpcd_USB_FS.Init.Sof_enable = 0;
   hpcd_USB_FS.Init.battery_charging_enable = DISABLE;
   if (HAL_PCD_Init(&hpcd_USB_FS) != HAL_OK)
   {
@@ -322,6 +296,10 @@ USBD_StatusTypeDef USBD_LL_Init(USBD_HandleTypeDef *pdev)
   HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x81 , PCD_SNG_BUF, 0xC0);
   HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x01 , PCD_SNG_BUF, 0x110);
   HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x82 , PCD_SNG_BUF, 0x100);
+/*
+  HAL_PCDEx_SetRxFiFo(&hpcd_USB_FS, 0x80);
+  HAL_PCDEx_SetTxFiFo(&hpcd_USB_FS, 0, 0x40);
+  HAL_PCDEx_SetTxFiFo(&hpcd_USB_FS, 1, 0x80);*/
   return USBD_OK;
 }
 
