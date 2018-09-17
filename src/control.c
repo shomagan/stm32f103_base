@@ -48,6 +48,7 @@
 //#include "usbd_cdc_if.h"
 #include "ds18.h"
 #include "ssd1306.h"
+#include "time_table.h"
 extern IWDG_HandleTypeDef hiwdg;
 /* ФБ "ПИД" */
 typedef union DataTypes_union{
@@ -97,6 +98,44 @@ void fb00099_exec(fb00099_IN_type * FBInputs,fb00099_VAR_type * FBVars,\
 #define DEFAULT_OUT 0.0f
 #define REQUIRE_VALUE 15.0f
 static void set_pwm_value(float value);
+static const time_table_t time_table_flow[] = {
+    {480,120},
+    {540,120},
+    {600,120},
+    {660,120},
+    {720,120},
+    {780,120},
+    {840,120},
+    {900,120},
+    {960,120},
+    {1020,120},
+    {1080,120},
+    {1140,120},
+    {1200,120},
+    {1260,120},
+    {1320,120},
+    {1380,120}
+};
+
+static const time_table_t time_table_ligth[] = {
+    {482,900},
+    {542,900},
+    {602,900},
+    {662,900},
+    {722,900},
+    {782,900},
+    {842,900},
+    {902,900},
+    {962,900},
+    {1022,900},
+    {1082,900},
+    {1142,900},
+    {1202,900},
+    {1262,900},
+    {1322,900},
+    {1382,900}
+};
+
 void control_task( const void *parameters){
     TickType_t control_time;
     static float pid_data = 0.0f;
@@ -129,9 +168,7 @@ void control_task( const void *parameters){
     while(1){
         //ds18_time = osKernelSysTick();
         u8 sensor_data_valid;
-
         sensor_data_valid = 0;
-
         for (uint8_t i = 0; i < temp_sensor_count; i++){
             if(ds18b20[i].data_validate) {
                 in.current_value.data.float32  = ds18b20[i].Temperature;
@@ -153,7 +190,6 @@ void control_task( const void *parameters){
             sprintf(buff,"pwm %f",value);
             SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
             SSD1306_UpdateScreen();
-
         }else{
             char buff[32];
             sprintf(buff,"temperature off");
@@ -164,6 +200,7 @@ void control_task( const void *parameters){
             set_pwm_value(DEFAULT_OUT);
             in.position.data.float32 = DEFAULT_OUT;	    	// float - необходимое положение регулятора в процентах
         }
+
         osDelay(1000);
         HAL_IWDG_Refresh(&hiwdg);
         //osDelayUntil(&ds18_time,_DS18B20_UPDATE_INTERVAL_MS);

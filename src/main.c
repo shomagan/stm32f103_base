@@ -128,11 +128,12 @@ void SystemClock_Config(void)
 
     /**Initializes the CPU, AHB and APB busses clocks 
     */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.LSIState = RCC_LSI_ON;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
@@ -157,7 +158,7 @@ void SystemClock_Config(void)
 
   PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC|RCC_PERIPHCLK_ADC
                               |RCC_PERIPHCLK_USB;
-  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
+  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
   PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
   PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLL_DIV1_5;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
@@ -266,53 +267,44 @@ static void MX_IWDG_Init(void)
 
 /* RTC init function */
 static void MX_RTC_Init(void){
-
-  /* USER CODE BEGIN RTC_Init 0 */
-
-  /* USER CODE END RTC_Init 0 */
-
   RTC_TimeTypeDef sTime;
-  RTC_DateTypeDef DateToUpdate;
+  HAL_RTCStateTypeDef rtc_state;
+  /**Initialize RTC and set the Time and Date
+  */
+  __HAL_RCC_BKP_CLK_ENABLE();
 
-  /* USER CODE BEGIN RTC_Init 1 */
+/* USER CODE BEGIN RTC_MspInit 0 */
+  __HAL_RCC_PWR_CLK_ENABLE();
+/* USER CODE END RTC_MspInit 0 */
+  HAL_PWR_EnableBkUpAccess();
+  /* Enable BKP CLK enable for backup registers */
+  /* Peripheral clock enable */
+  __HAL_RCC_RTC_ENABLE();
 
-  /* USER CODE END RTC_Init 1 */
-
-    /**Initialize RTC Only 
-    */
   hrtc.Instance = RTC;
   hrtc.Init.AsynchPrediv = RTC_AUTO_1_SECOND;
-  hrtc.Init.OutPut = RTC_OUTPUTSOURCE_ALARM;
+
   if (HAL_RTC_Init(&hrtc) != HAL_OK) {
     _Error_Handler(__FILE__, __LINE__);
   }
-  /* USER CODE BEGIN RTC_Init 2 */
 
-  /* USER CODE END RTC_Init 2 */
-
-    /**Initialize RTC and set the Time and Date 
+  HAL_RTC_GetTime(&hrtc,&sTime,RTC_FORMAT_BIN);
+    /**Initialize RTC Only 
     */
-  sTime.Hours = 12;
-  sTime.Minutes = 0;
-  sTime.Seconds = 0;
+  u32 data;
+  const  u32 data_c = 0x1234;
+    data = BKP->DR1;
 
-  if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK) {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-  /* USER CODE BEGIN RTC_Init 3 */
-
-  /* USER CODE END RTC_Init 3 */
-
-  DateToUpdate.WeekDay = RTC_WEEKDAY_MONDAY;
-  DateToUpdate.Month = RTC_MONTH_JANUARY;
-  DateToUpdate.Date = 1;
-  DateToUpdate.Year = 18;
-
-  if (HAL_RTC_SetDate(&hrtc, &DateToUpdate, RTC_FORMAT_BIN) != HAL_OK) {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-
+    if(data!=data_c){
+        BKP->DR1 = data_c;
+        sTime.Hours = 0x00;
+        sTime.Minutes = 0x22;
+        sTime.Seconds = 0x00;
+        if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK) {
+        _Error_Handler(__FILE__, __LINE__);
+        }
+    }
+    data = BKP->DR1;
 }
 
 /* TIM3 init function */
@@ -388,10 +380,6 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
 }
-
-/* USER CODE BEGIN 4 */
-
-/* USER CODE END 4 */
 
 /* StartDefaultTask function */
 void default_task(void const * argument){
