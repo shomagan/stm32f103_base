@@ -50,7 +50,7 @@
 #endif
 /*add functions and variable declarations below */
    //all start times in minuts all
-typedef struct {
+typedef struct __attribute__((__packed__)){
    u16 start_time;  //in minuts
    u16 length;  //in seconds
 }time_table_t;

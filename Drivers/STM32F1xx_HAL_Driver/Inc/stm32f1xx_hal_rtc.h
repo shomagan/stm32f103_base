@@ -502,6 +502,7 @@ do{                                                             \
 /** @addtogroup RTC_Exported_Functions_Group1
   * @{
   */
+uint32_t           RTC_ReadTimeCounter(RTC_HandleTypeDef* hrtc);
 HAL_StatusTypeDef HAL_RTC_Init(RTC_HandleTypeDef *hrtc);
 HAL_StatusTypeDef HAL_RTC_DeInit(RTC_HandleTypeDef *hrtc);
 void              HAL_RTC_MspInit(RTC_HandleTypeDef *hrtc);

@@ -40,6 +40,7 @@
  */
 #ifndef CONTROL_C
 #define CONTROL_C 1
+#include "main.h"
 #include "control.h"
 #include "FreeRTOS.h"
 #include "task.h"
@@ -49,6 +50,7 @@
 #include "ds18.h"
 #include "ssd1306.h"
 #include "time_table.h"
+#include "stm32f1xx_ll_gpio.h"
 extern IWDG_HandleTypeDef hiwdg;
 /* ФБ "ПИД" */
 typedef union DataTypes_union{
@@ -97,7 +99,17 @@ void fb00099_exec(fb00099_IN_type * FBInputs,fb00099_VAR_type * FBVars,\
 
 #define DEFAULT_OUT 0.0f
 #define REQUIRE_VALUE 15.0f
+extern RTC_HandleTypeDef hrtc;
 static void set_pwm_value(float value);
+static u8 check_state_machine(void);
+static void air_do_control(u8 enable);
+static void flow_do_control(u8 enable);
+static void ligth_do_control(u8 enable);
+void ligth2_do_control(u8 enable);
+typedef struct __attribute__((__packed__)){
+    u16 number;
+    u32 stop_time;  //in seconde
+}state_machine;
 static const time_table_t time_table_flow[] = {
     {480,120},
     {540,120},
@@ -114,7 +126,6 @@ static const time_table_t time_table_flow[] = {
     {1200,120},
     {1260,120},
     {1320,120},
-    {1380,120}
 };
 
 static const time_table_t time_table_ligth[] = {
@@ -132,10 +143,55 @@ static const time_table_t time_table_ligth[] = {
     {1142,900},
     {1202,900},
     {1262,900},
-    {1322,900},
-    {1382,900}
+};
+static const time_table_t time_table_ligth2[] = {
+    {482,900},
+    {512,900},
+    {542,900},
+    {572,900},
+    {602,900},
+    {632,900},
+    {662,900},
+    {692,900},
+    {722,900},
+    {752,900},
+    {782,900},
+    {812,900},
+    {842,900},
+    {872,900},
+    {902,900},
+    {932,900},
+    {962,900},
+    {992,900},
+    {1022,900},
+    {1032,900},
+    {1082,900},
+    {1112,900},
+    {1142,900},
+    {1172,900},
+    {1202,900},
+    {1232,900},
+    {1262,900},
+    {1292,900},
 };
 
+static const time_table_t time_table_air[] = {
+    {482,900},
+    {542,900},
+    {602,900},
+    {662,900},
+    {722,900},
+    {782,900},
+    {842,900},
+    {902,900},
+    {962,900},
+    {1022,900},
+    {1082,900},
+    {1142,900},
+    {1202,900},
+    {1262,900},
+};
+static state_machine flow,ligth,ligth2,air;
 void control_task( const void *parameters){
     TickType_t control_time;
     static float pid_data = 0.0f;
@@ -165,6 +221,10 @@ void control_task( const void *parameters){
     SSD1306_DrawCircle(10, 33, 7, SSD1306_COLOR_WHITE); //рисуем белую окружность в позиции 10;33 и радиусом 7 пикселей
     SSD1306_UpdateScreen();
     taskEXIT_CRITICAL();
+    flow.stop_time = 0;
+    ligth.stop_time = 0;
+    ligth2.stop_time = 0;
+    air.stop_time = 0;
     while(1){
         //ds18_time = osKernelSysTick();
         u8 sensor_data_valid;
@@ -200,12 +260,142 @@ void control_task( const void *parameters){
             set_pwm_value(DEFAULT_OUT);
             in.position.data.float32 = DEFAULT_OUT;	    	// float - необходимое положение регулятора в процентах
         }
-
+        check_state_machine();
         osDelay(1000);
         HAL_IWDG_Refresh(&hiwdg);
         //osDelayUntil(&ds18_time,_DS18B20_UPDATE_INTERVAL_MS);
     }
 }
+u8 check_state_machine(){
+    u16 item_number;
+    RTC_TimeTypeDef time;
+    u32 temp_sec;
+    u16 i;
+    LL_GPIO_TogglePin(LED_PORT, LED_PIN);
+    HAL_RTC_GetTime(&hrtc,&time,RTC_FORMAT_BIN);
+    if((time.Hours==0) && (time.Minutes==0)){
+        flow.stop_time = 0;
+        ligth.stop_time = 0;
+        ligth2.stop_time = 0;
+        air.stop_time = 0;
+        air_do_control(0);
+        flow_do_control(0);
+        ligth_do_control(0);
+        ligth2_do_control(0);
+    }else{
+        u32 current_sec = time.Hours*3600 + time.Minutes*60 + time.Seconds;
+        if(air.stop_time < current_sec){
+            item_number = sizeof(time_table_air)/sizeof (time_table_t);
+            for (i=0;i<item_number;i++){
+                temp_sec = time_table_air[i].start_time*60;
+                if((current_sec >= temp_sec) &&
+                    (current_sec <=(temp_sec + time_table_air[i].length))){
+                    air.stop_time = temp_sec + time_table_air[i].length;
+                    air.number = i;
+                    air_do_control(1);
+                    break;
+                }
+                if(i>=item_number){
+                    air.number = i;
+                    air.stop_time =0;
+                }
+            }
+        }
+        if(flow.stop_time < current_sec){
+            item_number = sizeof(time_table_flow)/sizeof (time_table_t);
+            for (u16 i=0;i<item_number;i++){
+                temp_sec = time_table_flow[i].start_time*60;
+                if((current_sec >= temp_sec) &&
+                    (current_sec <=(temp_sec + time_table_flow[i].length))){
+                    flow.stop_time = temp_sec + time_table_flow[i].length;
+                    flow.number = i;
+                    flow_do_control(1);
+                    break;
+                }
+                if(i>=item_number){
+                    flow.number = i;
+                    flow.stop_time =0;
+                }
+            }
+        }
+        if(ligth.stop_time < current_sec){
+            item_number = sizeof(time_table_ligth)/sizeof (time_table_t);
+            for (u16 i=0;i<item_number;i++){
+                temp_sec = time_table_ligth[i].start_time*60;
+                if((current_sec >= temp_sec) &&
+                    (current_sec <=(temp_sec + time_table_ligth[i].length))){
+                    ligth.stop_time = temp_sec + time_table_ligth[i].length;
+                    ligth.number = i;
+                    ligth_do_control(1);
+                    break;
+                }
+                if(i>=item_number){
+                    ligth.number = i;
+                    ligth.stop_time =0;
+                }
+            }
+        }
+        if(ligth2.stop_time < current_sec){
+            item_number = sizeof(time_table_ligth2)/sizeof (time_table_t);
+            for (u16 i=0;i<item_number;i++){
+                temp_sec = time_table_ligth2[i].start_time*60;
+                if((current_sec >= temp_sec) &&
+                    (current_sec <=(temp_sec + time_table_ligth2[i].length))){
+                    ligth2.stop_time = temp_sec + time_table_ligth2[i].length;
+                    ligth2.number = i;
+                    ligth2_do_control(1);
+                    break;
+                }
+                if(i>=item_number){
+                    ligth2.number = i;
+                    ligth2.stop_time =0;
+                }
+            }
+        }
+        if(air.stop_time <= current_sec){
+            air_do_control(0);
+        }
+        if(flow.stop_time <= current_sec){
+            flow_do_control(0);
+        }
+        if(ligth.stop_time <= current_sec){
+            ligth_do_control(0);
+        }
+        if(ligth2.stop_time <= current_sec){
+            ligth2_do_control(0);
+        }
+    }
+    return 0x00;
+}
+void air_do_control(u8 enable){
+    if(enable){
+        LL_GPIO_SetOutputPin(AIR_PORT,AIR_PIN);
+    }else{
+        LL_GPIO_ResetOutputPin(AIR_PORT,AIR_PIN);
+    }
+}
+void flow_do_control(u8 enable){
+    if(enable){
+        LL_GPIO_SetOutputPin(FLOW_PORT,FLOW_PIN);
+    }else{
+        LL_GPIO_ResetOutputPin(FLOW_PORT,FLOW_PIN);
+    }
+}
+void ligth_do_control(u8 enable){
+    if(enable){
+        LL_GPIO_SetOutputPin(LIGTH_PORT,LIGTH_PIN);
+    }else{
+        LL_GPIO_ResetOutputPin(LIGTH_PORT,LIGTH_PIN);
+    }
+}
+void ligth2_do_control(u8 enable){
+    if(enable){
+        LL_GPIO_SetOutputPin(LIGTH2_PORT,LIGTH2_PIN);
+    }else{
+        LL_GPIO_ResetOutputPin(LIGTH2_PORT,LIGTH2_PIN);
+    }
+}
+
 /*@brief set pwm output
  * @param value - [0;100]
  * */

@@ -51,6 +51,18 @@
 #ifndef __MAIN_H__
 #define __MAIN_H__
 
+#define AIR_PORT GPIOA
+#define AIR_PIN  LL_GPIO_PIN_7
+#define FLOW_PORT GPIOA
+#define FLOW_PIN  LL_GPIO_PIN_5
+#define LIGTH_PORT GPIOA
+#define LIGTH_PIN  LL_GPIO_PIN_4
+#define LIGTH2_PORT GPIOA
+#define LIGTH2_PIN  LL_GPIO_PIN_3
+
+#define LED_PORT GPIOC
+#define LED_PIN  LL_GPIO_PIN_13
+
 
 /* ########################## Assert Selection ############################## */
 /**
