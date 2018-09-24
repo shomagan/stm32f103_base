@@ -34,7 +34,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "i2c.h"
-
+#include "stm32f1xx_ll_gpio.h"
 
 I2C_HandleTypeDef hi2c1;
 
@@ -55,7 +55,14 @@ void MX_I2C1_Init(void)
       _Error_Handler(__FILE__, __LINE__);
     }
 }
-
+void i2c_deinit(void)
+{
+    if (HAL_I2C_DeInit(&hi2c1) != HAL_OK)
+    {
+      _Error_Handler(__FILE__, __LINE__);
+    }
+}
+static void HAL_GPIO_WRITE_ODR(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin);
 void HAL_I2C_MspInit(I2C_HandleTypeDef* hi2c)
 {
 
@@ -66,16 +73,111 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* hi2c)
       PB8     ------> I2C1_SCL
       PB9     ------> I2C1_SDA
       */
-      GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9;
-      GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
-      GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-      HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-      __HAL_AFIO_REMAP_I2C1_ENABLE();
+
       /* Peripheral clock enable */
       __HAL_RCC_I2C1_CLK_ENABLE();
+
+          static uint8_t resetTried = 0;
+          resetTried = 0;
+          if (resetTried == 1) {
+              return ;
+          }
+          uint32_t SDA_PIN = GPIO_PIN_8;
+          uint32_t SCL_PIN = GPIO_PIN_9;
+          GPIO_InitTypeDef GPIO_InitStruct;
+
+          // 1
+          __HAL_I2C_DISABLE(hi2c);
+
+          // 2
+          GPIO_InitStruct.Pin = SDA_PIN|SCL_PIN;
+          GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+          GPIO_InitStruct.Pull = GPIO_NOPULL;
+          GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+          HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+          HAL_GPIO_WRITE_ODR(GPIOB, SDA_PIN);
+          HAL_GPIO_WRITE_ODR(GPIOB, SCL_PIN);
+
+          // 3
+          GPIO_PinState pinState;
+          if (HAL_GPIO_ReadPin(GPIOB, SDA_PIN) == GPIO_PIN_RESET) {
+              for(;;){}
+          }
+          if (HAL_GPIO_ReadPin(GPIOB, SCL_PIN) == GPIO_PIN_RESET) {
+              for(;;){}
+          }
+
+          // 4
+          GPIO_InitStruct.Pin = SDA_PIN;
+          HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+          HAL_GPIO_TogglePin(GPIOB, SDA_PIN);
+
+          // 5
+          if (HAL_GPIO_ReadPin(GPIOB, SDA_PIN) == GPIO_PIN_SET) {
+              for(;;){}
+          }
+
+          // 6
+          GPIO_InitStruct.Pin = SCL_PIN;
+          HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+          HAL_GPIO_TogglePin(GPIOB, SCL_PIN);
+
+          // 7
+          if (HAL_GPIO_ReadPin(GPIOB, SCL_PIN) == GPIO_PIN_SET) {
+              for(;;){}
+          }
+
+          // 8
+          GPIO_InitStruct.Pin = SDA_PIN;
+          HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+          HAL_GPIO_WRITE_ODR(GPIOB, SDA_PIN);
+
+          // 9
+          if (HAL_GPIO_ReadPin(GPIOB, SDA_PIN) == GPIO_PIN_RESET) {
+              for(;;){}
+          }
+
+          // 10
+          GPIO_InitStruct.Pin = SCL_PIN;
+          HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+          HAL_GPIO_WRITE_ODR(GPIOB, SCL_PIN);
+
+          // 11
+          if (HAL_GPIO_ReadPin(GPIOB, SCL_PIN) == GPIO_PIN_RESET) {
+              for(;;){}
+          }
+
+          // 12
+          GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9;
+          GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
+          GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+          HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+         // 13
+         hi2c->Instance->CR1 |= I2C_CR1_SWRST;
+
+         // 14
+         hi2c->Instance->CR1 ^= I2C_CR1_SWRST;
+         __HAL_AFIO_REMAP_I2C1_ENABLE();
+         // 15
+         __HAL_I2C_ENABLE(hi2c);
+
+         resetTried = 1;
+
   }
 }
+void HAL_GPIO_WRITE_ODR(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin)
+{
+  /* Check the parameters */
+  assert_param(IS_GPIO_PIN(GPIO_Pin));
 
+  GPIOx->ODR |= GPIO_Pin;
+}
 void HAL_I2C_MspDeInit(I2C_HandleTypeDef* hi2c)
 {
 
@@ -88,6 +190,18 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* hi2c)
       PB9     ------> I2C1_SDA
       */
       HAL_GPIO_DeInit(GPIOB, GPIO_PIN_8|GPIO_PIN_9);
+      LL_GPIO_SetPinMode(GPIOB, GPIO_PIN_8, LL_GPIO_MODE_OUTPUT);
+      LL_GPIO_SetPinMode(GPIOB, GPIO_PIN_9, LL_GPIO_MODE_OUTPUT);
+      for (uint8_t i =0;i<8;i++){
+          LL_GPIO_SetOutputPin(GPIOB,GPIO_PIN_8);
+          LL_GPIO_SetOutputPin(GPIOB,GPIO_PIN_9);
+          LL_GPIO_ResetOutputPin(GPIOB,GPIO_PIN_8);
+          LL_GPIO_ResetOutputPin(GPIOB,GPIO_PIN_9);
+      }
+      HAL_GPIO_DeInit(GPIOB, GPIO_PIN_8|GPIO_PIN_9);
+      __HAL_AFIO_REMAP_I2C1_ENABLE();
+      /* Peripheral clock enable */
+      __HAL_RCC_I2C1_CLK_ENABLE();
 
   }
 } 

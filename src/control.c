@@ -111,21 +111,21 @@ typedef struct __attribute__((__packed__)){
     u32 stop_time;  //in seconde
 }state_machine;
 static const time_table_t time_table_flow[] = {
-    {480,120},
-    {540,120},
-    {600,120},
-    {660,120},
-    {720,120},
-    {780,120},
-    {840,120},
-    {900,120},
-    {960,120},
-    {1020,120},
-    {1080,120},
-    {1140,120},
-    {1200,120},
-    {1260,120},
-    {1320,120},
+    {480,600},
+    {540,600},
+    {600,600},
+    {660,600},
+    {720,600},
+    {780,600},
+    {840,600},
+    {900,600},
+    {960,600},
+    {1020,600},
+    {1080,600},
+    {1140,600},
+    {6000,600},
+    {1260,600},
+    {1320,600},
 };
 
 static const time_table_t time_table_ligth[] = {
@@ -164,7 +164,7 @@ static const time_table_t time_table_ligth2[] = {
     {962,900},
     {992,900},
     {1022,900},
-    {1032,900},
+    {1052,900},
     {1082,900},
     {1112,900},
     {1142,900},
@@ -176,26 +176,15 @@ static const time_table_t time_table_ligth2[] = {
 };
 
 static const time_table_t time_table_air[] = {
-    {482,900},
-    {542,900},
-    {602,900},
-    {662,900},
-    {722,900},
-    {782,900},
-    {842,900},
-    {902,900},
-    {962,900},
-    {1022,900},
-    {1082,900},
-    {1142,900},
-    {1202,900},
-    {1262,900},
+    {602,7200},
+    {840,7200},
+    {1202,7200}
 };
 static state_machine flow,ligth,ligth2,air;
 void control_task( const void *parameters){
     TickType_t control_time;
     static float pid_data = 0.0f;
-    u8 tick=0;
+    u32 tick=0;
     fb00099_IN_type in;
     fb00099_VAR_type var;
     fb00099_OUT_type out;
@@ -216,9 +205,7 @@ void control_task( const void *parameters){
     HAL_IWDG_Refresh(&hiwdg);
     SSD1306_Init();
     HAL_IWDG_Refresh(&hiwdg);
-    SSD1306_GotoXY(0, 44); //Устанавливаем курсор в позицию 0;44. Сначала по горизонтали, потом вертикали.
-    SSD1306_Puts("refregerator", &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
-    SSD1306_DrawCircle(10, 33, 7, SSD1306_COLOR_WHITE); //рисуем белую окружность в позиции 10;33 и радиусом 7 пикселей
+    //SSD1306_DrawCircle(10, 33, 7, SSD1306_COLOR_WHITE,0.5); //рисуем белую окружность в позиции 10;33 и радиусом 7 пикселей
     SSD1306_UpdateScreen();
     taskEXIT_CRITICAL();
     flow.stop_time = 0;
@@ -228,6 +215,7 @@ void control_task( const void *parameters){
     while(1){
         //ds18_time = osKernelSysTick();
         u8 sensor_data_valid;
+        tick++;
         sensor_data_valid = 0;
         for (uint8_t i = 0; i < temp_sensor_count; i++){
             if(ds18b20[i].data_validate) {
@@ -242,23 +230,27 @@ void control_task( const void *parameters){
             value = value <= 75.0f?value:75.0f;
             set_pwm_value(value);
             in.position.data.float32 = out.output.data.float32;
-            SSD1306_Fill(SSD1306_COLOR_BLACK);
-            SSD1306_GotoXY(0, 22); //Устанавливаем курсор в позицию 0;44. Сначала по горизонтали, потом вертикали.
-            sprintf(buff,"temperature %f",in.current_value.data.float32);
-            SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
-            SSD1306_GotoXY(0, 44); //Устанавливаем курсор в позицию 0;44. Сначала по горизонтали, потом вертикали.
-            sprintf(buff,"pwm %f",value);
-            SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+            sprintf(buff,"t - %3.1f, pwm - %3.1f",in.current_value.data.float32,value);
+            SSD1306_GotoXY(0, 44);
+            SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE);
             SSD1306_UpdateScreen();
         }else{
             char buff[32];
             sprintf(buff,"temperature off");
-            SSD1306_Fill(SSD1306_COLOR_BLACK);
+
             SSD1306_GotoXY(0, 44); //Устанавливаем курсор в позицию 0;44. Сначала по горизонтали, потом вертикали.
             SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
             SSD1306_UpdateScreen();
             set_pwm_value(DEFAULT_OUT);
             in.position.data.float32 = DEFAULT_OUT;	    	// float - необходимое положение регулятора в процентах
+        }
+        if(SSD1306.error_num){
+            SSD1306.Initialized = 0;
+        }
+        if((tick % 5) == 0){
+            if(!SSD1306.Initialized ){
+                SSD1306_Init();
+            }
         }
         check_state_machine();
         osDelay(1000);
@@ -273,6 +265,12 @@ u8 check_state_machine(){
     u16 i;
     LL_GPIO_TogglePin(LED_PORT, LED_PIN);
     HAL_RTC_GetTime(&hrtc,&time,RTC_FORMAT_BIN);
+    char buff[32];
+    sprintf(buff,"time %2u:%2u:%2u",time.Hours,time.Minutes,time.Seconds);
+    SSD1306_GotoXY(0, 0); //Устанавливаем курсор в позицию 0;44. Сначала по горизонтали, потом вертикали.
+    SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+    SSD1306_UpdateScreen();
+
     if((time.Hours==0) && (time.Minutes==0)){
         flow.stop_time = 0;
         ligth.stop_time = 0;
@@ -354,15 +352,46 @@ u8 check_state_machine(){
         }
         if(air.stop_time <= current_sec){
             air_do_control(0);
+            SSD1306_DrawCircle(8, 33, 7, SSD1306_COLOR_BLACK,1.0);
+            SSD1306_UpdateScreen();
+        }else{
+            u32 pass_time = current_sec - time_table_air[air.number].start_time * 60;
+            float part = (float)pass_time/(float)time_table_air[air.number].length;
+            SSD1306_DrawCircle(8, 33, 7, SSD1306_COLOR_WHITE,part);
+            SSD1306_UpdateScreen();
         }
         if(flow.stop_time <= current_sec){
             flow_do_control(0);
+            SSD1306_DrawCircle(23, 33, 7, SSD1306_COLOR_BLACK,1.0);
+            SSD1306_UpdateScreen();
+
+        }else{
+            u32 pass_time = current_sec - time_table_flow[flow.number].start_time * 60;
+            float part = (float)pass_time/(float)time_table_flow[flow.number].length;
+            SSD1306_DrawCircle(23, 33, 7, SSD1306_COLOR_WHITE,part);
+            SSD1306_UpdateScreen();
         }
         if(ligth.stop_time <= current_sec){
             ligth_do_control(0);
+            SSD1306_DrawCircle(38, 33, 7, SSD1306_COLOR_BLACK,1.0);
+            SSD1306_UpdateScreen();
+
+        }else{
+            u32 pass_time = current_sec - time_table_ligth[ligth.number].start_time * 60;
+            float part = (float)pass_time/(float)time_table_ligth[ligth.number].length;
+            SSD1306_DrawCircle(38, 33, 7, SSD1306_COLOR_WHITE,part);
+            SSD1306_UpdateScreen();
+
         }
         if(ligth2.stop_time <= current_sec){
             ligth2_do_control(0);
+            SSD1306_DrawCircle(53, 33, 7, SSD1306_COLOR_BLACK,1.0);
+            SSD1306_UpdateScreen();
+        }else{
+            u32 pass_time = current_sec - time_table_ligth2[ligth2.number].start_time * 60;
+            float part = (float)pass_time/(float)time_table_ligth2[ligth2.number].length;
+            SSD1306_DrawCircle(53, 33, 7, SSD1306_COLOR_WHITE,part);
+            SSD1306_UpdateScreen();
         }
     }
     return 0x00;

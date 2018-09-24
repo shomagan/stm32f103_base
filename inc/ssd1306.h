@@ -76,8 +76,16 @@ typedef enum {
 	SSD1306_COLOR_BLACK = 0x00, /*!< Black color, no pixel */
 	SSD1306_COLOR_WHITE = 0x01  /*!< Pixel is set. Color depends on LCD */
 } SSD1306_COLOR_t;
+    /* Private SSD1306 structure */
+    typedef struct {
+        uint16_t CurrentX;
+        uint16_t CurrentY;
+        uint8_t Inverted;
+        uint8_t Initialized;
+        uint16_t error_num;
+    } SSD1306_t;
 
-
+extern SSD1306_t SSD1306;
 
 /**
  * @brief  Initializes SSD1306 LCD
@@ -209,7 +217,7 @@ void SSD1306_DrawTriangle(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, ui
  * @param  c: Color to be used. This parameter can be a value of @ref SSD1306_COLOR_t enumeration
  * @retval None
  */
-void SSD1306_DrawCircle(int16_t x0, int16_t y0, int16_t r, SSD1306_COLOR_t c);
+void SSD1306_DrawCircle(int16_t x0, int16_t y0, int16_t r, SSD1306_COLOR_t c,float part);
 
 /**
  * @brief  Draws filled circle to STM buffer
@@ -258,7 +266,7 @@ void ssd1306_I2C_Write(uint8_t address, uint8_t reg, uint8_t data);
  */
 void ssd1306_I2C_WriteMulti(uint8_t address, uint8_t reg, uint8_t *data, uint16_t count);
 
-
+uint8_t ssf1306_init_sequence(void);
 
 /* C++ detection */
 #ifdef __cplusplus
