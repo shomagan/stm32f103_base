@@ -57,7 +57,7 @@
 #include "step.h"
 //#include "usbd_cdc_if.h"
 
-#define FEEDER 1
+#define FEEDER 0
 
 
 /* Private variables ---------------------------------------------------------*/
@@ -110,6 +110,7 @@ int main(void){
 #else
     osThreadDef(ds18_task, ds18_task, osPriorityHigh, 0, 364);
     defaultTaskHandle = osThreadCreate(osThread(ds18_task), NULL);
+
     osThreadDef(control_task, control_task, osPriorityNormal, 0, 364);
     defaultTaskHandle = osThreadCreate(osThread(control_task), NULL);
 #endif
@@ -399,7 +400,6 @@ void default_task(void const * argument){
                 char len;
                 time = osKernelSysTick();
                 len = sprintf(temp_buff,"temp - %lu:%f",time,ds18b20[i].Temperature);
-                // CDC_Transmit_FS(temp_buff, len);
                 time = osKernelSysTick();
                 while (osKernelSysTick()>(time+10)){
 
