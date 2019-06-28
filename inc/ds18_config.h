@@ -5,8 +5,6 @@
 //	Init timer on cube    1us per tick				example 72 MHz cpu >>> Prescaler=(72-1)      counter period=65000 
 //###################################################################################
 #define _DS18B20_MAX_SENSORS		    				7
-#define	_DS18B20_GPIO												GPIOB
-#define	_DS18B20_PIN												GPIO_PIN_15
 
 
 #define	_DS18B20_UPDATE_INTERVAL_MS					1000					//  (((	if==0  >> Ds18b20_ManualConvert()  )))    ((( if>0  >>>> Auto refresh )))

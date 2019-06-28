@@ -1,4 +1,4 @@
-
+﻿
 /**
   ******************************************************************************
   * @file           : main.c
@@ -54,8 +54,10 @@
 #include "ds18.h"
 #include "control.h"
 #include "stm32f1xx_ll_gpio.h"
+#include "step.h"
 //#include "usbd_cdc_if.h"
 
+#define FEEDER 1
 
 
 /* Private variables ---------------------------------------------------------*/
@@ -102,10 +104,15 @@ int main(void){
 
     osThreadDef(own_task, default_task, osPriorityNormal, 0, 364);
     defaultTaskHandle = osThreadCreate(osThread(own_task), NULL);
+#if FEEDER
+    osThreadDef(step_task, step_task, osPriorityNormal, 0, 364);
+    defaultTaskHandle = osThreadCreate(osThread(step_task), NULL);
+#else
     osThreadDef(ds18_task, ds18_task, osPriorityHigh, 0, 364);
     defaultTaskHandle = osThreadCreate(osThread(ds18_task), NULL);
     osThreadDef(control_task, control_task, osPriorityNormal, 0, 364);
     defaultTaskHandle = osThreadCreate(osThread(control_task), NULL);
+#endif
 
     /* Start scheduler */
     osKernelStart();
@@ -284,9 +291,9 @@ static void MX_RTC_Init(void){
     data = BKP->DR1;
     if(data!=data_c){
         BKP->DR1 = data_c;
-        sTime.Hours = 0x19;
-        sTime.Minutes = 0x05;
-        sTime.Seconds = 0x02;
+        sTime.Hours = 0x09;
+        sTime.Minutes = 0x01;
+        sTime.Seconds = 0x01;
         if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK) {
             _Error_Handler(__FILE__, __LINE__);
         }
@@ -357,9 +364,7 @@ static void MX_USART1_UART_Init(void)
         * EVENT_OUT
         * EXTI
 */
-static void MX_GPIO_Init(void)
-{
-
+static void MX_GPIO_Init(void){
     /* GPIO Ports Clock Enable */
     __HAL_RCC_GPIOC_CLK_ENABLE();
     __HAL_RCC_GPIOD_CLK_ENABLE();
@@ -370,12 +375,20 @@ static void MX_GPIO_Init(void)
     LL_GPIO_SetPinMode(LIGTH_PORT, LIGTH_PIN, LL_GPIO_MODE_OUTPUT);
     LL_GPIO_SetPinMode(LIGTH2_PORT, LIGTH2_PIN, LL_GPIO_MODE_OUTPUT);
     LL_GPIO_SetPinMode(LED_PORT, LED_PIN, LL_GPIO_MODE_OUTPUT);
-
+    LL_GPIO_SetPinMode(STEP_PORT, STEP_OUT1_1, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(STEP_PORT, STEP_OUT1_1,LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetPinMode(STEP_PORT, STEP_OUT1_2, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(STEP_PORT, STEP_OUT1_2,LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetPinMode(STEP_PORT, STEP_OUT2_1, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(STEP_PORT, STEP_OUT2_1,LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetPinMode(STEP_PORT, STEP_OUT2_2, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(STEP_PORT, STEP_OUT2_2,LL_GPIO_OUTPUT_PUSHPULL);
 }
 
 /* StartDefaultTask function */
 void default_task(void const * argument){
     /* init code for USB_DEVICE */
+    (void)argument;
     TickType_t time;
     //MX_USB_DEVICE_Init();
     HAL_IWDG_Refresh(&hiwdg);
@@ -485,3 +498,4 @@ void assert_failed(uint8_t* file, uint32_t line)
   */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
+

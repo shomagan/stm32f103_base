@@ -52,7 +52,7 @@
 #include "time_table.h"
 #include "stm32f1xx_ll_gpio.h"
 extern IWDG_HandleTypeDef hiwdg;
-/* ФБ "ПИД" */
+/* fb pid */
 typedef union DataTypes_union{
     u8 bit:1;
     u8 uint8;
@@ -98,7 +98,7 @@ void fb00099_exec(fb00099_IN_type * FBInputs,fb00099_VAR_type * FBVars,\
                   fb00099_OUT_type * FBOutputs);
 
 #define DEFAULT_OUT 0.0f
-#define REQUIRE_VALUE 15.0f
+#define REQUIRE_VALUE 27.0f
 extern RTC_HandleTypeDef hrtc;
 static void set_pwm_value(float value);
 static u8 check_state_machine(void);
@@ -111,79 +111,63 @@ typedef struct __attribute__((__packed__)){
     u32 stop_time;  //in seconde
 }state_machine;
 static const time_table_t time_table_flow[] = {
-    {480,600},
-    {540,600},
-    {600,600},
-    {660,600},
-    {720,600},
-    {780,600},
-    {840,600},
-    {900,600},
-    {960,600},
-    {1020,600},
-    {1080,600},
-    {1140,600},
-    {6000,600},
-    {1260,600},
-    {1320,600},
+    {600,1200},
+    {810,1200},
+    {1020,1200},
 };
 
 static const time_table_t time_table_ligth[] = {
-    {482,900},
-    {542,900},
-    {602,900},
-    {662,900},
-    {722,900},
-    {782,900},
-    {842,900},
-    {902,900},
-    {962,900},
-    {1022,900},
-    {1082,900},
-    {1142,900},
-    {1202,900},
-    {1262,900},
+    {600,1500},
+    {630,1500},
+    {660,1500},
+    {690,1500},
+    {720,1500},
+    {750,1500},
+    {780,1500},
+    {810,1500},
+    {840,1500},
+    {870,1500},
+    {900,1500},
+    {930,1500},
+    {960,1500},
+    {990,1500},
+    {1020,1500},
+    {1050,1500},
+    {1080,1500},
+    {1110,1500},
+    {1140,1500},
+    {1170,1500},
 };
 static const time_table_t time_table_ligth2[] = {
-    {482,900},
-    {512,900},
-    {542,900},
-    {572,900},
-    {602,900},
-    {632,900},
-    {662,900},
-    {692,900},
-    {722,900},
-    {752,900},
-    {782,900},
-    {812,900},
-    {842,900},
-    {872,900},
-    {902,900},
-    {932,900},
-    {962,900},
-    {992,900},
-    {1022,900},
-    {1052,900},
-    {1082,900},
-    {1112,900},
-    {1142,900},
-    {1172,900},
-    {1202,900},
-    {1232,900},
-    {1262,900},
-    {1292,900},
+    {600,1500},
+    {630,1500},
+    {660,1500},
+    {690,1500},
+    {720,1500},
+    {750,1500},
+    {780,1500},
+    {810,1500},
+    {840,1500},
+    {870,1500},
+    {900,1500},
+    {930,1500},
+    {960,1500},
+    {990,1500},
+    {1020,1500},
+    {1050,1500},
+    {1080,1500},
+    {1110,1500},
+    {1140,1500},
+    {1170,1500},
 };
 
 static const time_table_t time_table_air[] = {
-    {602,7200},
-    {840,7200},
-    {1202,7200}
+    {602,3600},
+    {840,3600},
+    {1202,3600}
 };
 static state_machine flow,ligth,ligth2,air;
 void control_task( const void *parameters){
-    TickType_t control_time;
-    static float pid_data = 0.0f;
     u32 tick=0;
     fb00099_IN_type in;
     fb00099_VAR_type var;
@@ -191,21 +175,21 @@ void control_task( const void *parameters){
     var.prev_error_integral.data.float32 = 0.0;
     var.error_integral.data.float32  = 0.0;
     var.number_tick.data.uint32=0.0;
-    in.enable.data.bit = 1;				// bit 0 - Ручное, 1 - Автоматическое
-    in.reverse_control.data.bit = 1;			// bit 1- реверсивное управление
-    in.rezet.data.bit = 0;			// bit 1- сброс накопленных параметров
-    in.require_value.data.float32 = REQUIRE_VALUE; 		// float Уставка регулирования
-    in.current_value.data.float32 = REQUIRE_VALUE;			// float Регулируемый параметр
-    in.kp.data.float32 = 75.0f;		 		// float Коэффициент пропорциональности
-    in.ki.data.float32 = 9.0f;		  		// float Коэффициент времени интегрирования
-    in.kd.data.float32 = -100.0f;				// float Коэффициент времени интегрирования
-    in.position.data.float32 = DEFAULT_OUT;	    	// float - необходимое положение регулятора в процентах
-    in.gist_tube.data.float32 = 0.5f;	 		// float Зона нечувствительности в единицах измеряемого параметра
+    in.enable.data.bit = 1;
+    in.reverse_control.data.bit = 0;
+    in.rezet.data.bit = 0;
+    in.require_value.data.float32 = REQUIRE_VALUE;
+    in.current_value.data.float32 = REQUIRE_VALUE;
+    in.kp.data.float32 = 75.0f;
+    in.ki.data.float32 = 9.0f;
+    in.kd.data.float32 = -100.0f;
+    in.position.data.float32 = DEFAULT_OUT;
+    in.gist_tube.data.float32 = 0.5f;
     taskENTER_CRITICAL();
     HAL_IWDG_Refresh(&hiwdg);
     SSD1306_Init();
     HAL_IWDG_Refresh(&hiwdg);
-    //SSD1306_DrawCircle(10, 33, 7, SSD1306_COLOR_WHITE,0.5); //рисуем белую окружность в позиции 10;33 и радиусом 7 пикселей
+    //SSD1306_DrawCircle(10, 33, 7, SSD1306_COLOR_WHITE,0.5);
     SSD1306_UpdateScreen();
     taskEXIT_CRITICAL();
     flow.stop_time = 0;
