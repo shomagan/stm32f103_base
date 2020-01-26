@@ -47,27 +47,25 @@
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
-#include "main.h"
+
 #include "stm32f1xx_hal.h"
 #include "cmsis_os.h"
-//#include "usb_device.h"
 #include "ds18.h"
 #include "control.h"
 #include "stm32f1xx_ll_gpio.h"
 #include "step.h"
-//#include "usbd_cdc_if.h"
-
+#include "main.h"
 #define FEEDER 0
 
 
 /* Private variables ---------------------------------------------------------*/
-ADC_HandleTypeDef hadc1;
+static ADC_HandleTypeDef hadc1;
 IWDG_HandleTypeDef hiwdg;
 RTC_HandleTypeDef hrtc;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart1;
-osThreadId defaultTaskHandle;
+static osThreadId own_task_id,ds18_task_id,control_task_id,step_task_id;
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -103,33 +101,26 @@ int main(void){
     MX_TIM2_Init();
 
     osThreadDef(own_task, default_task, osPriorityNormal, 0, 364);
-    defaultTaskHandle = osThreadCreate(osThread(own_task), NULL);
+    own_task_id = osThreadCreate(osThread(own_task), NULL);
 #if FEEDER
     osThreadDef(step_task, step_task, osPriorityNormal, 0, 364);
-    defaultTaskHandle = osThreadCreate(osThread(step_task), NULL);
+    step_task_id = osThreadCreate(osThread(step_task), NULL);
 #else
     osThreadDef(ds18_task, ds18_task, osPriorityHigh, 0, 364);
-    defaultTaskHandle = osThreadCreate(osThread(ds18_task), NULL);
-
+    ds18_task_id = osThreadCreate(osThread(ds18_task), NULL);
     osThreadDef(control_task, control_task, osPriorityNormal, 0, 364);
-    defaultTaskHandle = osThreadCreate(osThread(control_task), NULL);
+    control_task_id = osThreadCreate(osThread(control_task), NULL);
 #endif
-
     /* Start scheduler */
     osKernelStart();
-
-    while (1)  {
-
-    }
-
+    while (1)  { }
 }
 
 /**
   * @brief System Clock Configuration
   * @retval None
   */
-void SystemClock_Config(void)
-{
+void SystemClock_Config(void){
 
     RCC_OscInitTypeDef RCC_OscInitStruct;
     RCC_ClkInitTypeDef RCC_ClkInitStruct;
@@ -388,28 +379,12 @@ static void MX_GPIO_Init(void){
 
 /* StartDefaultTask function */
 void default_task(void const * argument){
-    /* init code for USB_DEVICE */
     (void)argument;
-    TickType_t time;
-    //MX_USB_DEVICE_Init();
     HAL_IWDG_Refresh(&hiwdg);
     while(1)  {
-        for (char i=0;i<_DS18B20_MAX_SENSORS;i++){
-            if(ds18b20[i].data_validate){
-                char temp_buff[32];
-                char len;
-                time = osKernelSysTick();
-                len = sprintf(temp_buff,"temp - %lu:%f",time,ds18b20[i].Temperature);
-                time = osKernelSysTick();
-                while (osKernelSysTick()>(time+10)){
-
-                }
-            }
-        }
         HAL_IWDG_Refresh(&hiwdg);
         osDelay(1000);
     }
-    /* USER CODE END 5 */
 }
 /* TIM2 init function */
 static void MX_TIM2_Init(void){

@@ -40,7 +40,6 @@
  */
 #ifndef CONTROL_C
 #define CONTROL_C 1
-#include "main.h"
 #include "control.h"
 #include "FreeRTOS.h"
 #include "task.h"
@@ -51,7 +50,7 @@
 #include "ssd1306.h"
 #include "time_table.h"
 #include "stm32f1xx_ll_gpio.h"
-extern IWDG_HandleTypeDef hiwdg;
+#include "main.h"
 /* fb pid */
 typedef union DataTypes_union{
     u8 bit:1;
@@ -99,7 +98,7 @@ void fb00099_exec(fb00099_IN_type * FBInputs,fb00099_VAR_type * FBVars,\
 
 #define DEFAULT_OUT 0.0f
 #define REQUIRE_VALUE 27.0f
-extern RTC_HandleTypeDef hrtc;
+
 static void set_pwm_value(float value);
 static u8 check_state_machine(void);
 static void air_do_control(u8 enable);

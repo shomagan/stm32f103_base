@@ -25,14 +25,12 @@ file(GLOB FREERTOS_HEADERS  ${FREERTOS_HEADERS} freertos/cmsis_os/*.h)
 #freertos source and headers files END
 
 file(GLOB_RECURSE USER_SOURCES src/*.c)
-file(GLOB USB_CORE Middlewares/ST/STM32_USB_Device_Library/Core/Src/*.c)
-file(GLOB USB_CLASS_CDC Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/*.c)
 file(GLOB HAL_SOURCES Drivers/${MCU_FAMILY}_HAL_DRIVER/Src/*.c)
 file(GLOB CMSIS_SYSTEM src/system_${MCU_FAMILY}.c)
 file(GLOB CMSIS_STARTUP Drivers/CMSIS/Device/ST/STM32F1xx/Source/Templates/gcc/startup_stm32f103x6.s)
 file(GLOB LINKER_FILE ${MCU_LINKER_SCRIPT})
 
-set(SOURCE_FILES  ${USB_CORE} ${USB_CLASS_CDC} ${USER_SOURCES} ${HAL_SOURCES} ${CMSIS_SYSTEM} ${CMSIS_STARTUP} ${LINKER_FILE})
+set(SOURCE_FILES  ${USER_SOURCES} ${HAL_SOURCES} ${CMSIS_SYSTEM} ${CMSIS_STARTUP} ${LINKER_FILE})
 
 file(MAKE_DIRECTORY ${PROJECT_SOURCE_DIR}/build)
 set(BUILD_TARGET ${PROJECT_NAME}.elf)
@@ -55,9 +53,6 @@ target_include_directories(${PROJECT_NAME}.elf PUBLIC Drivers/CMSIS/Device/ST/${
 target_include_directories(${PROJECT_NAME}.elf PUBLIC Drivers/CMSIS/Include)
 target_include_directories(${PROJECT_NAME}.elf PUBLIC Drivers/${MCU_FAMILY}_HAL_Driver/Inc)
 target_include_directories(${PROJECT_NAME}.elf PUBLIC inc)
-
-target_include_directories(${PROJECT_NAME}.elf PUBLIC Middlewares/ST/STM32_USB_Device_Library/Core/Inc)
-target_include_directories(${PROJECT_NAME}.elf PUBLIC Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc)
 
 set_target_properties(${BUILD_TARGET} PROPERTIES LINK_FLAGS 
     "-mcpu=${MCU_ARCH}\

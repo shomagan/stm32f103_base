@@ -79,6 +79,12 @@ PA10     ------> USART1_RX
 */
 #define LED_PORT GPIOC
 #define LED_PIN  LL_GPIO_PIN_13
+extern IWDG_HandleTypeDef hiwdg;
+extern RTC_HandleTypeDef hrtc;
+extern TIM_HandleTypeDef htim2;
+extern TIM_HandleTypeDef htim3;
+extern UART_HandleTypeDef huart1;
+extern TIM_HandleTypeDef htim1;
 
 
 /* ########################## Assert Selection ############################## */

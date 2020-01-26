@@ -48,7 +48,7 @@
   */
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f1xx_hal.h"
-
+#include "main.h"
 extern void _Error_Handler(char *, int);
 /* USER CODE BEGIN 0 */
 

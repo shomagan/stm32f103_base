@@ -45,8 +45,8 @@
 #include "task.h"
 #include "semphr.h"
 #include "cmsis_os.h"
-//#include "usbd_cdc_if.h"
-extern IWDG_HandleTypeDef hiwdg;
+#include "main.h"
+
 Ds18b20Sensor_t	ds18b20[_DS18B20_MAX_SENSORS];
 
 static OneWire_t one_wire;

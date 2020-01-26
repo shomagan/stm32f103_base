@@ -35,17 +35,12 @@
 #include "stm32f1xx.h"
 #include "stm32f1xx_it.h"
 #include "cmsis_os.h"
-
+#include "main.h"
 /* USER CODE BEGIN 0 */
 
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
-extern PCD_HandleTypeDef hpcd_USB_FS;
-extern RTC_HandleTypeDef hrtc;
-extern TIM_HandleTypeDef htim3;
-extern UART_HandleTypeDef huart1;
-extern TIM_HandleTypeDef htim1;
 
 /******************************************************************************/
 /*            Cortex-M3 Processor Interruption and Exception Handlers         */ 
@@ -219,7 +214,7 @@ void TIM3_IRQHandler(void){
 /**
 * @brief This function handles TIM2 global interrupt.
 */
-extern TIM_HandleTypeDef htim2;
+
 void TIM2_IRQHandler(void){
   HAL_TIM_IRQHandler(&htim2);
 }

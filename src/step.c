@@ -2,7 +2,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "stm32f1xx_ll_gpio.h"
-extern IWDG_HandleTypeDef hiwdg;
+
 static void step_out_1_disable(void);
 static void step_out_2_disable(void);
 static void step_out_1_forward(void);
@@ -12,7 +12,7 @@ static void step_out_2_reverse(void);
 static void forward(int time);
 static void reverse(int time);
 #define STEP_DELAY 15
-extern RTC_HandleTypeDef hrtc;
+
 void step_task( const void *parameters){
     (void)parameters;
     u32 kernel_tick = osKernelSysTick();

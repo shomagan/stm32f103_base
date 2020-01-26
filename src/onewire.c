@@ -19,7 +19,9 @@
 #include "stm32f1xx_hal.h"
 #include "onewire.h"
 #include "ds18_config.h"
-extern TIM_HandleTypeDef htim2;
+#include "main.h"
+
+
 void ONEWIRE_DELAY(uint16_t time_us)
 {
 	_DS18B20_TIMER.Instance->CNT = 0;
