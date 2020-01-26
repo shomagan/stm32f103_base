@@ -50,23 +50,13 @@
 #include "stm32f1xx_hal.h"
 #include "main.h"
 extern void _Error_Handler(char *, int);
-/* USER CODE BEGIN 0 */
-
-/* USER CODE END 0 */
 /**
   * Initializes the Global MSP.
   */
-void HAL_MspInit(void)
-{
-  /* USER CODE BEGIN MspInit 0 */
-
-  /* USER CODE END MspInit 0 */
-
+void HAL_MspInit(void){
   __HAL_RCC_AFIO_CLK_ENABLE();
   __HAL_RCC_PWR_CLK_ENABLE();
-
   HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
-
   /* System interrupt init*/
   /* MemoryManagement_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(MemoryManagement_IRQn, 0, 0);
@@ -86,24 +76,13 @@ void HAL_MspInit(void)
     /**ENABLE: Full SWJ (JTAG-DP + SW-DP): Reset State 
     */
   __HAL_AFIO_REMAP_SWJ_ENABLE();
-
-  /* USER CODE BEGIN MspInit 1 */
-
-  /* USER CODE END MspInit 1 */
 }
 
-void HAL_ADC_MspInit(ADC_HandleTypeDef* hadc)
-{
-
+void HAL_ADC_MspInit(ADC_HandleTypeDef* hadc){
   GPIO_InitTypeDef GPIO_InitStruct;
-  if(hadc->Instance==ADC1)
-  {
-  /* USER CODE BEGIN ADC1_MspInit 0 */
-
-  /* USER CODE END ADC1_MspInit 0 */
+  if(hadc->Instance==ADC1){
     /* Peripheral clock enable */
     __HAL_RCC_ADC1_CLK_ENABLE();
-  
     /**ADC1 GPIO Configuration    
     PA0-WKUP     ------> ADC1_IN0
     PA1     ------> ADC1_IN1 
@@ -111,45 +90,21 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* hadc)
     GPIO_InitStruct.Pin = ADC0_PIN|ADC1_PIN;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
     HAL_GPIO_Init(ADC_PORT, &GPIO_InitStruct);
-
-  /* USER CODE BEGIN ADC1_MspInit 1 */
-
-  /* USER CODE END ADC1_MspInit 1 */
   }
-
 }
 
-void HAL_ADC_MspDeInit(ADC_HandleTypeDef* hadc)
-{
-
-  if(hadc->Instance==ADC1)
-  {
-  /* USER CODE BEGIN ADC1_MspDeInit 0 */
-
-  /* USER CODE END ADC1_MspDeInit 0 */
+void HAL_ADC_MspDeInit(ADC_HandleTypeDef* hadc){
+  if(hadc->Instance==ADC1)  {
     /* Peripheral clock disable */
     __HAL_RCC_ADC1_CLK_DISABLE();
-  
-
     HAL_GPIO_DeInit(GPIOA, ADC0_PIN|ADC1_PIN);
-
-  /* USER CODE BEGIN ADC1_MspDeInit 1 */
-
-  /* USER CODE END ADC1_MspDeInit 1 */
   }
-
 }
 
-void HAL_RTC_MspInit(RTC_HandleTypeDef* hrtc)
-{
-
-  if(hrtc->Instance==RTC)
-  {
+void HAL_RTC_MspInit(RTC_HandleTypeDef* hrtc){
+  if(hrtc->Instance==RTC)  {
     __HAL_RCC_BKP_CLK_ENABLE();
-
-  /* USER CODE BEGIN RTC_MspInit 0 */
     __HAL_RCC_PWR_CLK_ENABLE();
-  /* USER CODE END RTC_MspInit 0 */
     HAL_PWR_EnableBkUpAccess();
     /* Enable BKP CLK enable for backup registers */
     /* Peripheral clock enable */
@@ -157,11 +112,7 @@ void HAL_RTC_MspInit(RTC_HandleTypeDef* hrtc)
     /* RTC interrupt Init */
     HAL_NVIC_SetPriority(RTC_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(RTC_IRQn);
-  /* USER CODE BEGIN RTC_MspInit 1 */
-
-  /* USER CODE END RTC_MspInit 1 */
   }
-
 }
 
 void HAL_RTC_MspDeInit(RTC_HandleTypeDef* hrtc){
@@ -185,9 +136,7 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim_base){
 
 }
 
-void HAL_TIM_MspPostInit(TIM_HandleTypeDef* htim)
-{
-
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef* htim){
   GPIO_InitTypeDef GPIO_InitStruct;
   if(htim->Instance==TIM3)  {
     /**TIM3 GPIO Configuration    
@@ -210,18 +159,11 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* htim_base){
   }
 }
 
-void HAL_UART_MspInit(UART_HandleTypeDef* huart)
-{
-
+void HAL_UART_MspInit(UART_HandleTypeDef* huart){
   GPIO_InitTypeDef GPIO_InitStruct;
-  if(huart->Instance==USART1)
-  {
-  /* USER CODE BEGIN USART1_MspInit 0 */
-
-  /* USER CODE END USART1_MspInit 0 */
+  if(huart->Instance==USART1)  {
     /* Peripheral clock enable */
     __HAL_RCC_USART1_CLK_ENABLE();
-  
     /**USART1 GPIO Configuration    
     PA9     ------> USART1_TX
     PA10     ------> USART1_RX 
@@ -235,46 +177,25 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
     /* USART1 interrupt Init */
     HAL_NVIC_SetPriority(USART1_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(USART1_IRQn);
-  /* USER CODE BEGIN USART1_MspInit 1 */
-
-  /* USER CODE END USART1_MspInit 1 */
   }
-
 }
 
-void HAL_UART_MspDeInit(UART_HandleTypeDef* huart)
-{
-
-  if(huart->Instance==USART1)
-  {
-  /* USER CODE BEGIN USART1_MspDeInit 0 */
-
-  /* USER CODE END USART1_MspDeInit 0 */
+void HAL_UART_MspDeInit(UART_HandleTypeDef* huart){
+  if(huart->Instance==USART1)  {
     /* Peripheral clock disable */
     __HAL_RCC_USART1_CLK_DISABLE();
-  
     /**USART1 GPIO Configuration    
     PA9     ------> USART1_TX
     PA10     ------> USART1_RX 
     */
     HAL_GPIO_DeInit(GPIOA, GPIO_PIN_9|GPIO_PIN_10);
-
     /* USART1 interrupt DeInit */
     HAL_NVIC_DisableIRQ(USART1_IRQn);
-  /* USER CODE BEGIN USART1_MspDeInit 1 */
-
-  /* USER CODE END USART1_MspDeInit 1 */
   }
-
 }
-
-/* USER CODE BEGIN 1 */
-
-/* USER CODE END 1 */
 
 /**
   * @}
