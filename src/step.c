@@ -17,8 +17,6 @@ void step_task( const void *parameters){
     (void)parameters;
     u32 kernel_tick = osKernelSysTick();
     RTC_TimeTypeDef time;
-
-
     step_out_1_disable();
     step_out_2_disable();
     step_out_2_reverse();

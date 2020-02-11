@@ -54,16 +54,19 @@ target_include_directories(${PROJECT_NAME}.elf PUBLIC Drivers/CMSIS/Include)
 target_include_directories(${PROJECT_NAME}.elf PUBLIC Drivers/${MCU_FAMILY}_HAL_Driver/Inc)
 target_include_directories(${PROJECT_NAME}.elf PUBLIC inc)
 
+set(MAP_FILE ${PROJECT_SOURCE_DIR}/build/output.map)
+
 set_target_properties(${BUILD_TARGET} PROPERTIES LINK_FLAGS 
     "-mcpu=${MCU_ARCH}\
     -mthumb\
     -O0\
     -specs=nosys.specs\
-    -Wl,-gc-sections -T${PROJECT_SOURCE_DIR}/${MCU_LINKER_SCRIPT}")
+    -Wl,-gc-sections -T${PROJECT_SOURCE_DIR}/${MCU_LINKER_SCRIPT}\
+    -Wl,-Map,${MAP_FILE}")
 target_compile_options(${BUILD_TARGET} PUBLIC 
                              -mcpu=${MCU_ARCH}
                              -mthumb -mthumb-interwork
-                              -g -O0 
+                              -g -O2
                              -ffunction-sections -fdata-sections -fno-common -fmessage-length=0)
 
 set(HEX_FILE ${PROJECT_SOURCE_DIR}/build/${PROJECT_NAME}.hex)

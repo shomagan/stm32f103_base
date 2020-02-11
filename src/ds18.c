@@ -107,7 +107,7 @@ void ds18_task( const void *parameters){
  * */
 static uint8_t find_device(){
     do	{
-        one_wire_init(&one_wire,_DS18B20_GPIO ,_DS18B20_PIN);
+        one_wire_init(&one_wire,DS18B20_GPIO ,DS18B20_PIN);
         temp_sensor_count = 0;
         while(HAL_GetTick() < 3000){
             osDelay(100);

@@ -213,7 +213,7 @@ void control_task( const void *parameters){
             value = value <= 75.0f?value:75.0f;
             set_pwm_value(value);
             in.position.data.float32 = out.output.data.float32;
-            sprintf(buff,"t - %3.1f, pwm - %3.1f",in.current_value.data.float32,value);
+            sprintf(buff,"t - %3.1f, pwm - %3.1f", in.current_value.data.float32, value);
             SSD1306_GotoXY(0, 44);
             SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE);
             SSD1306_UpdateScreen();
