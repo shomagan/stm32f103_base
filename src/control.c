@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file control.c
  * @author Shoma Gane <shomagan@gmail.com>
  *         Ayrat Girfanov <girfanov.ayrat@yandex.ru>
@@ -40,8 +40,6 @@
  */
 #ifndef CONTROL_C
 #define CONTROL_C 1
-
-#include "main.h"
 #include "control.h"
 #include "FreeRTOS.h"
 #include "task.h"
@@ -52,7 +50,7 @@
 #include "ssd1306.h"
 #include "time_table.h"
 #include "stm32f1xx_ll_gpio.h"
-extern IWDG_HandleTypeDef hiwdg;
+#include "main.h"
 /* fb pid */
 typedef union DataTypes_union{
     u8 bit:1;
@@ -100,7 +98,7 @@ void pid_exec(pid_in_type * FBInputs,pid_var_type * FBVars,\
 
 #define DEFAULT_OUT 0.0f
 #define REQUIRE_VALUE -40.0f
-extern RTC_HandleTypeDef hrtc;
+
 static void set_pwm_value(float value);
 static u8 check_state_machine(void);
 static void air_do_control(u8 enable);
@@ -215,7 +213,7 @@ void control_task( const void *parameters){
             value = value <= 75.0f?value:75.0f;
             set_pwm_value(value);
             in.position.data.float32 = out.output.data.float32;
-            sprintf(buff,"t - %3.1f, pwm - %3.1f",in.current_value.data.float32,value);
+            sprintf(buff,"t - %3.1f, pwm - %3.1f", in.current_value.data.float32, value);
             SSD1306_GotoXY(0, 44);
             SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE);
             SSD1306_UpdateScreen();

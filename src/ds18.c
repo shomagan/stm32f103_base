@@ -45,8 +45,8 @@
 #include "task.h"
 #include "semphr.h"
 #include "cmsis_os.h"
-//#include "usbd_cdc_if.h"
-extern IWDG_HandleTypeDef hiwdg;
+#include "main.h"
+
 Ds18b20Sensor_t	ds18b20[_DS18B20_MAX_SENSORS];
 
 static OneWire_t one_wire;
@@ -109,7 +109,7 @@ void ds18_task( const void *parameters){
  * */
 static uint8_t find_device(){
     do	{
-        one_wire_init(&one_wire,_DS18B20_GPIO ,_DS18B20_PIN);
+        one_wire_init(&one_wire,DS18B20_GPIO ,DS18B20_PIN);
         temp_sensor_count = 0;
         osDelay(250);
         one_wire_devices = one_wire_first(&one_wire);

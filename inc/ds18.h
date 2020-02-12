@@ -42,7 +42,7 @@
 #define DS18_H 1
  
 /*add includes below */
-#include "main.h"
+
 #include "ds18_config.h"
 #include "onewire.h"
 #include <stdbool.h>
@@ -57,7 +57,7 @@ void ds18_task( const void *parameters);
 typedef struct{
 	uint8_t 	Address[8];
 	float 		Temperature;
-	bool			data_validate;	
+    uint8_t			data_validate;
 }Ds18b20Sensor_t;
 //###################################################################################
 

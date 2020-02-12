@@ -1,4 +1,4 @@
-/**
+﻿/**
   ******************************************************************************
   * @file           : main.h
   * @brief          : Header for main.c file.
@@ -50,9 +50,8 @@
 /* Define to prevent recursive inclusion -------------------------------------*/
 #ifndef __MAIN_H__
 #define __MAIN_H__
-
+/*port a*/
 #define TRIGER_CONTROL_WITHOUT_PWM 1
-
 #define PID_OUT_PORT_0 GPIOA
 #define PID_OUT_PIN_0 LL_GPIO_PIN_6
 #define PID_OUT_PIN_HAL_0 GPIO_PIN_6
@@ -75,26 +74,37 @@
 #define LIGTH_PIN  LL_GPIO_PIN_4
 #define LIGTH2_PORT GPIOA
 #define LIGTH2_PIN  LL_GPIO_PIN_3
-#define	_DS18B20_GPIO  GPIOB
-#define	_DS18B20_PIN   GPIO_PIN_15
+#define ADC0_PIN  GPIO_PIN_0
+#define ADC1_PIN  GPIO_PIN_1
+#define ADC_PORT GPIOA
+
+/**
+ * USART1 GPIO Configuration
+ * PA9     ------> USART1_TX
+ * PA10     ------> USART1_RX
+ */
+
+/*port b*/
+#define	DS18B20_GPIO  GPIOB
+#define	DS18B20_PIN   GPIO_PIN_15
 #define I2C1_SCL_PORT GPIOB
 #define I2C1_SCL  GPIO_PIN_8
 #define I2C1_SDA_PORT GPIOB
 #define I2C1_SDA  GPIO_PIN_9
-#define ADC0_PIN  GPIO_PIN_0
-#define ADC1_PIN  GPIO_PIN_1
-#define ADC_PORT GPIOA
 #define STEP_OUT1_1 LL_GPIO_PIN_13
 #define STEP_OUT1_2 LL_GPIO_PIN_14
 #define STEP_OUT2_1 LL_GPIO_PIN_11
 #define STEP_OUT2_2 LL_GPIO_PIN_12
 #define STEP_PORT GPIOB
-/**USART1 GPIO Configuration
-PA9     ------> USART1_TX
-PA10     ------> USART1_RX
-*/
 #define LED_PORT GPIOC
 #define LED_PIN  LL_GPIO_PIN_13
+
+extern IWDG_HandleTypeDef hiwdg;
+extern RTC_HandleTypeDef hrtc;
+extern TIM_HandleTypeDef htim2;
+extern TIM_HandleTypeDef htim3;
+extern UART_HandleTypeDef huart1;
+extern TIM_HandleTypeDef htim1;
 
 
 /* ########################## Assert Selection ############################## */
