@@ -10,6 +10,8 @@ project(${PRJ_NAME} C CXX ASM)
 
 add_definitions(-D${MCU_LINE})
 add_definitions(-DUSE_HAL_LIBRARY)
+add_definitions(-DSTM32F103x6)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 if(LIB_INSTALL_DIR)
 else()
@@ -40,10 +42,12 @@ file(GLOB STM32_HEADERS ${STM32_HEADERS} Drivers/CMSIS/Include/*.h)
 file(GLOB STM32_HEADERS ${STM32_HEADERS} Drivers/*.h)
 file(GLOB STM32_HEADERS ${STM32_HEADERS} Drivers/${MCU_FAMILY}_HAL_Driver/Inc/*.h)
 file(GLOB STM32_LEGACY_HEADERS Drivers/${MCU_FAMILY}_HAL_Driver/Inc/Legacy/*.h)
+file(GLOB TEENY_USB usb_stack/src/*.c)
+file(GLOB TEENY_USB_CLASS usb_stack/class/*.c)
 #stm_hal files END
 file(GLOB LINKER_FILE ${MCU_LINKER_SCRIPT})
 
-set(SOURCE_FILES  ${USER_SOURCES} ${HAL_SOURCES} ${CMSIS_SYSTEM} ${CMSIS_STARTUP} ${LINKER_FILE})
+set(SOURCE_FILES  ${USER_SOURCES} ${HAL_SOURCES} ${CMSIS_SYSTEM} ${CMSIS_STARTUP} ${LINKER_FILE} ${TEENY_USB} ${TEENY_USB_CLASS})
 
 file(MAKE_DIRECTORY ${PROJECT_SOURCE_DIR}/build)
 set(BUILD_TARGET ${PROJECT_NAME}.elf)
@@ -75,6 +79,9 @@ target_include_directories(${PROJECT_NAME}.elf PUBLIC Drivers/CMSIS/Device/ST/${
 target_include_directories(${PROJECT_NAME}.elf PUBLIC Drivers/CMSIS/Include)
 target_include_directories(${PROJECT_NAME}.elf PUBLIC Drivers/${MCU_FAMILY}_HAL_Driver/Inc)
 target_include_directories(${PROJECT_NAME}.elf PUBLIC inc)
+#usb
+target_include_directories(${PROJECT_NAME}.elf PUBLIC usb_stack/inc)
+target_include_directories(${PROJECT_NAME}.elf PUBLIC usb_stack/class)
 
 set(MAP_FILE ${PROJECT_SOURCE_DIR}/build/output.map)
 

@@ -55,8 +55,9 @@
 #include "stm32f1xx_ll_gpio.h"
 #include "step.h"
 #include "main.h"
-#define FEEDER 0
-
+#include "tusbd_cdc.h"
+#define FEEDER 1
+#define ADC_USE 0
 
 /* Private variables ---------------------------------------------------------*/
 static ADC_HandleTypeDef hadc1;
@@ -65,7 +66,14 @@ RTC_HandleTypeDef hrtc;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart1;
-static osThreadId own_task_id,ds18_task_id,control_task_id,step_task_id;
+static osThreadId own_task_id;
+
+#if FEEDER
+static osThreadId step_task_id;
+#else
+static osThreadId ds18_task_id,control_task_id;
+#endif
+
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -77,7 +85,7 @@ static void MX_ADC1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
-void default_task(void const * argument);
+void own_task(void const * argument);
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
@@ -89,18 +97,17 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
   */
 int main(void){
     HAL_Init();
-
     SystemClock_Config();
-
     MX_GPIO_Init();
     MX_IWDG_Init();
     MX_RTC_Init();
-    //MX_ADC1_Init();
+#if ADC_USE
+    MX_ADC1_Init();
+#endif
     MX_USART1_UART_Init();
     MX_TIM3_Init();
     MX_TIM2_Init();
-
-    osThreadDef(own_task, default_task, osPriorityNormal, 0, 364);
+    osThreadDef(own_task, own_task, osPriorityNormal, 0, 364);
     own_task_id = osThreadCreate(osThread(own_task), NULL);
 #if FEEDER
     osThreadDef(step_task, step_task, osPriorityNormal, 0, 364);
@@ -121,13 +128,10 @@ int main(void){
   * @retval None
   */
 void SystemClock_Config(void){
-
     RCC_OscInitTypeDef RCC_OscInitStruct;
     RCC_ClkInitTypeDef RCC_ClkInitStruct;
     RCC_PeriphCLKInitTypeDef PeriphClkInit;
-
-    /**Initializes the CPU, AHB and APB busses clocks
-    */
+    /**Initializes the CPU, AHB and APB busses clocks*/
     RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
     RCC_OscInitStruct.HSEState = RCC_HSE_ON;
     RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
@@ -137,56 +141,40 @@ void SystemClock_Config(void){
     RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
     RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
     RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
-    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-    {
+    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK){
         _Error_Handler(__FILE__, __LINE__);
     }
-
-    /**Initializes the CPU, AHB and APB busses clocks
-    */
+    /**Initializes the CPU, AHB and APB busses clocks   */
     RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
             |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
     RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
     RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
     RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
     RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-
-    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
-    {
+    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK){
         _Error_Handler(__FILE__, __LINE__);
     }
-
     PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC|RCC_PERIPHCLK_ADC
             |RCC_PERIPHCLK_USB;
     PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
     PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
     PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLL_DIV1_5;
-    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
-    {
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK){
         _Error_Handler(__FILE__, __LINE__);
     }
-
-    /**Configure the Systick interrupt time
-    */
+    /**Configure the Systick interrupt time*/
     HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
-
-    /**Configure the Systick
-    */
+    /**Configure the Systick*/
     HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
-
     /* SysTick_IRQn interrupt configuration */
     HAL_NVIC_SetPriority(SysTick_IRQn, 15, 0);
 }
 
 /* ADC1 init function */
-static void MX_ADC1_Init(void)
-{
-
+static void MX_ADC1_Init(void){
     ADC_ChannelConfTypeDef sConfig;
     ADC_InjectionConfTypeDef sConfigInjected;
-
-    /**Common config
-    */
+    /**Common config*/
     hadc1.Instance = ADC1;
     hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
     hadc1.Init.ContinuousConvMode = DISABLE;
@@ -195,23 +183,19 @@ static void MX_ADC1_Init(void)
     hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
     hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
     hadc1.Init.NbrOfConversion = 1;
-    if (HAL_ADC_Init(&hadc1) != HAL_OK)
-    {
+    if (HAL_ADC_Init(&hadc1) != HAL_OK){
         _Error_Handler(__FILE__, __LINE__);
     }
 
-    /**Configure Regular Channel
-    */
+    /**Configure Regular Channel*/
     sConfig.Channel = ADC_CHANNEL_0;
     sConfig.Rank = ADC_REGULAR_RANK_1;
     sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
-    if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-    {
+    if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK){
         _Error_Handler(__FILE__, __LINE__);
     }
 
-    /**Configure Injected Channel
-    */
+    /**Configure Injected Channel*/
     sConfigInjected.InjectedChannel = ADC_CHANNEL_0;
     sConfigInjected.InjectedRank = ADC_INJECTED_RANK_1;
     sConfigInjected.InjectedNbrOfConversion = 4;
@@ -220,49 +204,37 @@ static void MX_ADC1_Init(void)
     sConfigInjected.AutoInjectedConv = DISABLE;
     sConfigInjected.InjectedDiscontinuousConvMode = ENABLE;
     sConfigInjected.InjectedOffset = 0;
-    if (HAL_ADCEx_InjectedConfigChannel(&hadc1, &sConfigInjected) != HAL_OK)
-    {
+    if (HAL_ADCEx_InjectedConfigChannel(&hadc1, &sConfigInjected) != HAL_OK){
         _Error_Handler(__FILE__, __LINE__);
     }
 
-    /**Configure Injected Channel
-    */
+    /**Configure Injected Channel*/
     sConfigInjected.InjectedRank = ADC_INJECTED_RANK_2;
-    if (HAL_ADCEx_InjectedConfigChannel(&hadc1, &sConfigInjected) != HAL_OK)
-    {
+    if (HAL_ADCEx_InjectedConfigChannel(&hadc1, &sConfigInjected) != HAL_OK){
         _Error_Handler(__FILE__, __LINE__);
     }
 
-    /**Configure Injected Channel
-    */
+    /**Configure Injected Channel*/
     sConfigInjected.InjectedRank = ADC_INJECTED_RANK_3;
-    if (HAL_ADCEx_InjectedConfigChannel(&hadc1, &sConfigInjected) != HAL_OK)
-    {
+    if (HAL_ADCEx_InjectedConfigChannel(&hadc1, &sConfigInjected) != HAL_OK){
         _Error_Handler(__FILE__, __LINE__);
     }
 
-    /**Configure Injected Channel
-    */
+    /**Configure Injected Channel*/
     sConfigInjected.InjectedRank = ADC_INJECTED_RANK_4;
-    if (HAL_ADCEx_InjectedConfigChannel(&hadc1, &sConfigInjected) != HAL_OK)
-    {
+    if (HAL_ADCEx_InjectedConfigChannel(&hadc1, &sConfigInjected) != HAL_OK){
         _Error_Handler(__FILE__, __LINE__);
     }
-
 }
 
 /* IWDG init function */
-static void MX_IWDG_Init(void)
-{
-
+static void MX_IWDG_Init(void){
     hiwdg.Instance = IWDG;
     hiwdg.Init.Prescaler = IWDG_PRESCALER_256;
     hiwdg.Init.Reload = 4095;
-    if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
-    {
+    if (HAL_IWDG_Init(&hiwdg) != HAL_OK){
         _Error_Handler(__FILE__, __LINE__);
     }
-
 }
 
 /* RTC init function */
@@ -333,9 +305,7 @@ static void MX_TIM3_Init(void){
 
 
 /* USART1 init function */
-static void MX_USART1_UART_Init(void)
-{
-
+static void MX_USART1_UART_Init(void){
     huart1.Instance = USART1;
     huart1.Init.BaudRate = 115200;
     huart1.Init.WordLength = UART_WORDLENGTH_8B;
@@ -378,14 +348,78 @@ static void MX_GPIO_Init(void){
     LL_GPIO_SetPinMode(STEP_PORT, STEP_OUT2_2, LL_GPIO_MODE_OUTPUT);
     LL_GPIO_SetPinOutputType(STEP_PORT, STEP_OUT2_2,LL_GPIO_OUTPUT_PUSHPULL);
 }
+// The CDC recv buffer size should equal to the out endpoint size
+// or we will need a timeout to flush the recv buffer
+#define CDC_RX_EP_SIZE    32
+static __ALIGN_BEGIN uint8_t cdc_buf[CDC_RX_EP_SIZE] __ALIGN_END;
+
+int cdc_recv_data(tusb_cdc_device_t* cdc, const void* data, uint16_t len);
+int cdc_send_done(tusb_cdc_device_t* cdc);
+void cdc_line_coding_change(tusb_cdc_device_t* cdc);
+
+static tusb_cdc_device_t cdc_dev = {
+  .backend = &cdc_device_backend,
+  .ep_in = 1,
+  .ep_out = 1,
+  .ep_int = 8,
+  .on_recv_data = cdc_recv_data,
+  .on_send_done = cdc_send_done,
+  .on_line_coding_change = cdc_line_coding_change,
+  .rx_buf = cdc_buf,
+  .rx_size = sizeof(cdc_buf),
+};
+static int cdc_len = 0;
+void cdc_line_coding_change(tusb_cdc_device_t* cdc){
+  // TODO, handle the line coding change
+  //cdc->line_coding.bitrate;
+  //cdc->line_coding.databits;
+  //cdc->line_coding.stopbits;
+  //cdc->line_coding.parity;
+}
+
+int cdc_recv_data(tusb_cdc_device_t* cdc, const void* data, uint16_t len){
+  cdc_len = (int)len;
+  return 1; // return 1 means the recv buffer is busy
+}
+
+int cdc_send_done(tusb_cdc_device_t* cdc){
+  tusb_set_rx_valid(cdc->dev, cdc->ep_out);
+  return 0;
+}
+// make sure the interface order is same in "composite_desc.lua"
+static tusb_device_interface_t* device_interfaces[] = {
+  (tusb_device_interface_t*)&cdc_dev, 0,   // CDC need two interfaces
+};
+
+static void init_ep(tusb_device_t* dev){
+  CDC_ACM_TUSB_INIT(dev);
+}
+void tusb_delay_ms(uint32_t ms){
+    osDelay(1);
+}
+
+
+static tusb_device_config_t device_config = {
+  .if_count = sizeof(device_interfaces)/sizeof(device_interfaces[0]),
+  .interfaces = &device_interfaces[0],
+  .ep_init = init_ep,
+};
 
 /* StartDefaultTask function */
-void default_task(void const * argument){
+void own_task(void const * argument){
     (void)argument;
     HAL_IWDG_Refresh(&hiwdg);
-    while(1)  {
+    tusb_device_t* dev = tusb_get_device(TEST_APP_USB_CORE);
+    tusb_set_device_config(dev, &device_config);
+    tusb_open_device(dev);
+
+    while(1){
         HAL_IWDG_Refresh(&hiwdg);
-        osDelay(1000);
+        osDelay(10);
+        if(cdc_len){
+            tusb_cdc_device_send(&cdc_dev, cdc_buf, (u16)cdc_len);
+            cdc_len = 0;
+        }
     }
 }
 /* TIM2 init function */
@@ -422,15 +456,10 @@ static void MX_TIM2_Init(void){
   * @param  htim : TIM handle
   * @retval None
   */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-    /* USER CODE BEGIN Callback 0 */
-
-    /* USER CODE END Callback 0 */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
     if (htim->Instance == TIM1) {
         HAL_IncTick();
     }
-
 }
 
 /**
@@ -439,14 +468,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   * @param  line: The line in file as a number.
   * @retval None
   */
-void _Error_Handler(char *file, int line)
-{
-    /* USER CODE BEGIN Error_Handler_Debug */
-    /* User can add his own implementation to report the HAL error return state */
-    while(1)
-    {
+void _Error_Handler(char *file, int line){
+    while(1){
     }
-    /* USER CODE END Error_Handler_Debug */
 }
 
 #ifdef  USE_FULL_ASSERT
