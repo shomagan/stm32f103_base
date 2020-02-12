@@ -69,17 +69,18 @@ void ds18_task( const void *parameters){
     error_read_counter = 0;
     while(1){
         if(error_read_counter >= MAX_ERROR_READ_COUNTER ){
-            find_device();
             error_read_counter = 0;
             data_valid = 0;
+            find_device();
         }
         ds18b20_timeout=_DS18B20_CONVERT_TIMEOUT_MS;
         ds18b20_start_calc(&one_wire);
         while (!ds18b20_calc_done(&one_wire)){
             osDelay(1);
             ds18b20_timeout-=1;
-            if(ds18b20_timeout==0)
-				break;
+            if(ds18b20_timeout==0){
+                break;
+            }
 		}	
         if(ds18b20_timeout>0){
             for (uint8_t i = 0; i < temp_sensor_count; i++){
@@ -102,20 +103,19 @@ void ds18_task( const void *parameters){
         osDelay(_DS18B20_UPDATE_INTERVAL_MS);
 	}
 }
-/*@brief infinity cycle while did't find device
+/**
+ * @brief infinity cycle while did't find device
  *
  * */
 static uint8_t find_device(){
     do	{
         one_wire_init(&one_wire,_DS18B20_GPIO ,_DS18B20_PIN);
         temp_sensor_count = 0;
-        while(HAL_GetTick() < 3000){
-            osDelay(100);
-        }
+        osDelay(250);
         one_wire_devices = one_wire_first(&one_wire);
         while (one_wire_devices){
-            osDelay(100);
             temp_sensor_count++;
+            osDelay(250);
             one_wire_get_full_rom(&one_wire, ds18b20[temp_sensor_count-1].Address);
             one_wire_devices = one_wire_next(&one_wire);
         }
@@ -130,7 +130,6 @@ static uint8_t find_device(){
         osDelay(50);
         ds18b20_disable_alarm_temperature(&one_wire,  ds18b20[i].Address);
     }
-
     return temp_sensor_count;
 }
 

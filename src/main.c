@@ -292,7 +292,7 @@ static void MX_RTC_Init(void){
     data = BKP->DR1;
     if(data!=data_c){
         BKP->DR1 = data_c;
-        sTime.Hours = 0x09;
+        sTime.Hours = 0x01;
         sTime.Minutes = 0x01;
         sTime.Seconds = 0x01;
         if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK) {
@@ -307,6 +307,7 @@ static void MX_TIM3_Init(void){
     TIM_ClockConfigTypeDef sClockSourceConfig;
     TIM_MasterConfigTypeDef sMasterConfig;
     TIM_OC_InitTypeDef pwm_handle;
+#if TRIGER_CONTROL_WITHOUT_PWM == 0
     htim3.Instance = TIM3;
     htim3.Init.Prescaler = 0;
     htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
@@ -335,6 +336,7 @@ static void MX_TIM3_Init(void){
     if (HAL_TIM_PWM_ConfigChannel(&htim3, &pwm_handle, TIM_CHANNEL_1) != HAL_OK)  {
         _Error_Handler(__FILE__, __LINE__);
     }
+#endif
     HAL_TIM_MspPostInit(&htim3);
 }
 
@@ -394,18 +396,6 @@ void default_task(void const * argument){
     //MX_USB_DEVICE_Init();
     HAL_IWDG_Refresh(&hiwdg);
     while(1)  {
-        for (char i=0;i<_DS18B20_MAX_SENSORS;i++){
-            if(ds18b20[i].data_validate){
-                char temp_buff[32];
-                char len;
-                time = osKernelSysTick();
-                len = sprintf(temp_buff,"temp - %lu:%f",time,ds18b20[i].Temperature);
-                time = osKernelSysTick();
-                while (osKernelSysTick()>(time+10)){
-
-                }
-            }
-        }
         HAL_IWDG_Refresh(&hiwdg);
         osDelay(1000);
     }

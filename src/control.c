@@ -40,6 +40,7 @@
  */
 #ifndef CONTROL_C
 #define CONTROL_C 1
+
 #include "main.h"
 #include "control.h"
 #include "FreeRTOS.h"
@@ -78,7 +79,7 @@ typedef struct {
     register_type kd;				// float Коэффициент времени интегрирования
     register_type position;	    	// float - необходимое положение регулятора в процентах
     register_type gist_tube;	 		// float Зона нечувствительности в единицах измеряемого параметра
-} fb00099_IN_type;
+} pid_in_type;
 
 typedef struct {
     register_type error_integral;		// float - накопленная ошибка интегратора
@@ -86,19 +87,19 @@ typedef struct {
     register_type prev_control_integral;			// float - накопленное воздействия на регулирующий орган
     register_type enable_old;			// bit - для отслеживания первого такта включения
     register_type number_tick;			// uint32 - количество тактов после включения,для интервала работы
-} fb00099_VAR_type;
+} pid_var_type;
 
 typedef struct {
     register_type error;	     	// bit Индикация ошибки входных параметров
     register_type output;	    	// float - необходимое положение регулятора в процентах
     register_type test;				// float
-} fb00099_OUT_type;
+} pid_out_type;
 
-void fb00099_exec(fb00099_IN_type * FBInputs,fb00099_VAR_type * FBVars,\
-                  fb00099_OUT_type * FBOutputs);
+void pid_exec(pid_in_type * FBInputs,pid_var_type * FBVars,\
+                  pid_out_type * FBOutputs);
 
 #define DEFAULT_OUT 0.0f
-#define REQUIRE_VALUE 27.0f
+#define REQUIRE_VALUE -40.0f
 extern RTC_HandleTypeDef hrtc;
 static void set_pwm_value(float value);
 static u8 check_state_machine(void);
@@ -169,14 +170,14 @@ static const time_table_t time_table_air[] = {
 static state_machine flow,ligth,ligth2,air;
 void control_task( const void *parameters){
     u32 tick=0;
-    fb00099_IN_type in;
-    fb00099_VAR_type var;
-    fb00099_OUT_type out;
+    pid_in_type in;
+    pid_var_type var;
+    pid_out_type out;
     var.prev_error_integral.data.float32 = 0.0;
     var.error_integral.data.float32  = 0.0;
     var.number_tick.data.uint32=0.0;
     in.enable.data.bit = 1;
-    in.reverse_control.data.bit = 0;
+    in.reverse_control.data.bit = 1;//set reverse control
     in.rezet.data.bit = 0;
     in.require_value.data.float32 = REQUIRE_VALUE;
     in.current_value.data.float32 = REQUIRE_VALUE;
@@ -206,7 +207,7 @@ void control_task( const void *parameters){
                 in.current_value.data.float32  = ds18b20[i].Temperature;
             }
         }
-        fb00099_exec(&in,&var,&out);
+        pid_exec(&in,&var,&out);
         if(data_valid) {
             static float value;
             char buff[32];
@@ -409,11 +410,14 @@ void ligth2_do_control(u8 enable){
     }
 }
 
-/*@brief set pwm output
+/**
+ * @brief set pwm output
  * @param value - [0;100]
  * */
 void set_pwm_value(float value){
+#if TRIGER_CONTROL_WITHOUT_PWM == 0
     u16 pulse = 0;
+
     static u16 pulse_prev = MAX_PWM_VALUE+1;
     value = value > 100.0f?100.0f:value;
     value = value < 0.0f?0.0f:value;
@@ -437,14 +441,28 @@ void set_pwm_value(float value){
         HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
         pulse_prev = pulse;
     }
+#else
+    if(value > 0){
+        LL_GPIO_SetOutputPin(PID_OUT_PORT_0, PID_OUT_PIN_0);
+        LL_GPIO_SetOutputPin(PID_OUT_PORT_1, PID_OUT_PIN_1);
+        LL_GPIO_SetOutputPin(PID_OUT_PORT_2, PID_OUT_PIN_2);
+        LL_GPIO_SetOutputPin(PID_OUT_PORT_3, PID_OUT_PIN_3);
+    }else{
+        LL_GPIO_ResetOutputPin(PID_OUT_PORT_0, PID_OUT_PIN_0);
+        LL_GPIO_ResetOutputPin(PID_OUT_PORT_1, PID_OUT_PIN_1);
+        LL_GPIO_ResetOutputPin(PID_OUT_PORT_2, PID_OUT_PIN_2);
+        LL_GPIO_ResetOutputPin(PID_OUT_PORT_3, PID_OUT_PIN_3);
+    }
+
+#endif
 }
 
 #define IntegralAccum -25
-void fb00099_exec(fb00099_IN_type * FBInputs,fb00099_VAR_type * FBVars,\
-                  fb00099_OUT_type * FBOutputs) {
-    fb00099_IN_type *IN =  FBInputs;
-    fb00099_VAR_type *VAR =  FBVars;
-    fb00099_OUT_type *OUT = FBOutputs;
+void pid_exec(pid_in_type * FBInputs,pid_var_type * FBVars,\
+                  pid_out_type * FBOutputs) {
+    pid_in_type *IN =  FBInputs;
+    pid_var_type *VAR =  FBVars;
+    pid_out_type *OUT = FBOutputs;
     float error_diff; //"невязка" и её изменение
     float du_kp;
     float du_ki;
