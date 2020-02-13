@@ -378,31 +378,31 @@ void cdc_line_coding_change(tusb_cdc_device_t* cdc){
 }
 
 int cdc_recv_data(tusb_cdc_device_t* cdc, const void* data, uint16_t len){
-  cdc_len = (int)len;
-  return 1; // return 1 means the recv buffer is busy
+    cdc_len = (int)len;
+    return 1; // return 1 means the recv buffer is busy
 }
 
 int cdc_send_done(tusb_cdc_device_t* cdc){
-  tusb_set_rx_valid(cdc->dev, cdc->ep_out);
-  return 0;
+    tusb_set_rx_valid(cdc->dev, cdc->ep_out);
+    return 0;
 }
 // make sure the interface order is same in "composite_desc.lua"
 static tusb_device_interface_t* device_interfaces[] = {
-  (tusb_device_interface_t*)&cdc_dev, 0,   // CDC need two interfaces
+    (tusb_device_interface_t*)&cdc_dev, 0,   // CDC need two interfaces
 };
 
 static void init_ep(tusb_device_t* dev){
-  CDC_ACM_TUSB_INIT(dev);
+    CDC_ACM_TUSB_INIT(dev);
 }
 void tusb_delay_ms(uint32_t ms){
-    osDelay(1);
+    osDelay(ms);
 }
 
 
 static tusb_device_config_t device_config = {
-  .if_count = sizeof(device_interfaces)/sizeof(device_interfaces[0]),
-  .interfaces = &device_interfaces[0],
-  .ep_init = init_ep,
+    .if_count = sizeof(device_interfaces)/sizeof(device_interfaces[0]),
+    .interfaces = &device_interfaces[0],
+    .ep_init = init_ep,
 };
 
 /* StartDefaultTask function */
@@ -481,12 +481,7 @@ void _Error_Handler(char *file, int line){
   * @param  line: assert_param error line source number
   * @retval None
   */
-void assert_failed(uint8_t* file, uint32_t line)
-{ 
-    /* USER CODE BEGIN 6 */
-    /* User can add his own implementation to report the file name and line number,
-     tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-    /* USER CODE END 6 */
+void assert_failed(uint8_t* file, uint32_t line){ 
 }
 #endif /* USE_FULL_ASSERT */
 
