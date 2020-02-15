@@ -40,7 +40,9 @@ extern C {
  */
 #include "stm32f1xx_hal.h"
 #include "string.h"
-
+#define USE_FONT_7_10 1
+#define USE_FONT_11_18 0
+#define USE_FONT_16_26 0
 /**
  * @defgroup LIB_Typedefs
  * @brief    Library Typedefs
@@ -77,18 +79,23 @@ typedef struct {
 /**
  * @brief  7 x 10 pixels font size structure 
  */
+#if    USE_FONT_7_10
 extern FontDef_t Font_7x10;
+#endif
 
 /**
  * @brief  11 x 18 pixels font size structure 
  */
+#if    USE_FONT_11_18
 extern FontDef_t Font_11x18;
+#endif
 
 /**
  * @brief  16 x 26 pixels font size structure 
  */
+#if    USE_FONT_16_26
 extern FontDef_t Font_16x26;
-
+#endif
 /**
  * @}
  */

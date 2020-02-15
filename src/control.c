@@ -45,7 +45,6 @@
 #include "task.h"
 #include "semphr.h"
 #include "cmsis_os.h"
-//#include "usbd_cdc_if.h"
 #include "ds18.h"
 #include "ssd1306.h"
 #include "time_table.h"
@@ -100,11 +99,21 @@ void pid_exec(pid_in_type * FBInputs,pid_var_type * FBVars,\
 #define REQUIRE_VALUE -40.0f
 
 static void set_pwm_value(float value);
+static void set_controller_value(float value);
 static u8 check_state_machine(void);
 static void air_do_control(u8 enable);
 static void flow_do_control(u8 enable);
-static void ligth_do_control(u8 enable);
+static void ligth1_do_control(u8 enable);
 void ligth2_do_control(u8 enable);
+static void soft_state_control(void);
+typedef enum{
+    SOFT_DISABLE,
+    SOFT_AWAKE,
+    SOFT_SLEEP,
+}soft_state_t;
+static soft_state_t soft_ligth1_state = SOFT_DISABLE;
+const static u16 SOFT_TIME_INTERVAL_MS = 10000;
+static u16 soft_time_interval = 0;
 typedef struct __attribute__((__packed__)){
     u16 number;
     u32 stop_time;  //in seconde
@@ -115,7 +124,7 @@ static const time_table_t time_table_flow[] = {
     {1020,1200},
 };
 
-static const time_table_t time_table_ligth[] = {
+static const time_table_t time_table_ligth1[] = {
     {600,1500},
     {630,1500},
     {660,1500},
@@ -165,7 +174,7 @@ static const time_table_t time_table_air[] = {
     {840,3600},
     {1202,3600}
 };
-static state_machine flow,ligth,ligth2,air;
+static state_machine flow,ligth1,ligth2,air;
 void control_task( const void *parameters){
     u32 tick=0;
     pid_in_type in;
@@ -192,7 +201,7 @@ void control_task( const void *parameters){
     SSD1306_UpdateScreen();
     taskEXIT_CRITICAL();
     flow.stop_time = 0;
-    ligth.stop_time = 0;
+    ligth1.stop_time = 0;
     ligth2.stop_time = 0;
     air.stop_time = 0;
     while(1){
@@ -208,23 +217,25 @@ void control_task( const void *parameters){
         pid_exec(&in,&var,&out);
         if(data_valid) {
             static float value;
-            char buff[32];
+            char buff[32] = "temp - ";
+            buff[9] = 0;
+            SSD1306_GotoXY(0, 44);
+            SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE);
+            int temp;
             value = out.output.data.float32 >= 0.0f?out.output.data.float32:0.0f;
             value = value <= 75.0f?value:75.0f;
-            set_pwm_value(value);
+            set_controller_value(value);
             in.position.data.float32 = out.output.data.float32;
-            sprintf(buff,"t - %3.1f, pwm - %3.1f", in.current_value.data.float32, value);
-            SSD1306_GotoXY(0, 44);
+            temp = (int)in.position.data.float32;
+            itoa(temp,buff,10);
             SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE);
             SSD1306_UpdateScreen();
         }else{
-            char buff[32];
-            sprintf(buff,"temperature off");
-
+            char buff[] = "temperature off";
             SSD1306_GotoXY(0, 44); //Устанавливаем курсор в позицию 0;44. Сначала по горизонтали, потом вертикали.
             SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
             SSD1306_UpdateScreen();
-            set_pwm_value(DEFAULT_OUT);
+            set_controller_value(DEFAULT_OUT);
             in.position.data.float32 = DEFAULT_OUT;	    	// float - необходимое положение регулятора в процентах
         }
         if(SSD1306.error_num){
@@ -248,20 +259,32 @@ u8 check_state_machine(){
     u16 i;
     LL_GPIO_TogglePin(LED_PORT, LED_PIN);
     HAL_RTC_GetTime(&hrtc,&time,RTC_FORMAT_BIN);
-    char buff[32];
-    sprintf(buff,"time %2u:%2u:%2u",time.Hours,time.Minutes,time.Seconds);
     SSD1306_GotoXY(0, 0); //Устанавливаем курсор в позицию 0;44. Сначала по горизонтали, потом вертикали.
+    char buff[32] = "time ";
+    buff[7] = 0;
+    SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+    itoa(time.Hours,buff,10);
+    SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+    buff[0] = 0x3a ;// ":"
+    buff[1] = 0 ;// ":"
+    SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+    itoa(time.Minutes,buff,10);
+    SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+    buff[0] = 0x3a ;// ":"
+    buff[1] = 0 ;// ":"
+    SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+    itoa(time.Seconds,buff,10);
     SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
     SSD1306_UpdateScreen();
 
     if((time.Hours==0) && (time.Minutes==0)){
         flow.stop_time = 0;
-        ligth.stop_time = 0;
+        ligth1.stop_time = 0;
         ligth2.stop_time = 0;
         air.stop_time = 0;
         air_do_control(0);
         flow_do_control(0);
-        ligth_do_control(0);
+        ligth1_do_control(0);
         ligth2_do_control(0);
     }else{
         u32 current_sec = time.Hours*3600 + time.Minutes*60 + time.Seconds;
@@ -299,20 +322,20 @@ u8 check_state_machine(){
                 }
             }
         }
-        if(ligth.stop_time < current_sec){
-            item_number = sizeof(time_table_ligth)/sizeof (time_table_t);
+        if(ligth1.stop_time < current_sec){
+            item_number = sizeof(time_table_ligth1)/sizeof (time_table_t);
             for (u16 i=0;i<item_number;i++){
-                temp_sec = time_table_ligth[i].start_time*60;
+                temp_sec = time_table_ligth1[i].start_time*60;
                 if((current_sec >= temp_sec) &&
-                    (current_sec <=(temp_sec + time_table_ligth[i].length))){
-                    ligth.stop_time = temp_sec + time_table_ligth[i].length;
-                    ligth.number = i;
-                    ligth_do_control(1);
+                    (current_sec <=(temp_sec + time_table_ligth1[i].length))){
+                    ligth1.stop_time = temp_sec + time_table_ligth1[i].length;
+                    ligth1.number = i;
+                    ligth1_do_control(1);
                     break;
                 }
                 if(i>=item_number){
-                    ligth.number = i;
-                    ligth.stop_time =0;
+                    ligth1.number = i;
+                    ligth1.stop_time =0;
                 }
             }
         }
@@ -354,14 +377,14 @@ u8 check_state_machine(){
             SSD1306_DrawCircle(23, 33, 7, SSD1306_COLOR_WHITE,part);
             SSD1306_UpdateScreen();
         }
-        if(ligth.stop_time <= current_sec){
-            ligth_do_control(0);
+        if(ligth1.stop_time <= current_sec){
+            ligth1_do_control(0);
             SSD1306_DrawCircle(38, 33, 7, SSD1306_COLOR_BLACK,1.0);
             SSD1306_UpdateScreen();
 
         }else{
-            u32 pass_time = current_sec - time_table_ligth[ligth.number].start_time * 60;
-            float part = (float)pass_time/(float)time_table_ligth[ligth.number].length;
+            u32 pass_time = current_sec - time_table_ligth1[ligth1.number].start_time * 60;
+            float part = (float)pass_time/(float)time_table_ligth1[ligth1.number].length;
             SSD1306_DrawCircle(38, 33, 7, SSD1306_COLOR_WHITE,part);
             SSD1306_UpdateScreen();
 
@@ -377,6 +400,7 @@ u8 check_state_machine(){
             SSD1306_UpdateScreen();
         }
     }
+    soft_state_control();
     return 0x00;
 }
 void air_do_control(u8 enable){
@@ -393,7 +417,7 @@ void flow_do_control(u8 enable){
         LL_GPIO_ResetOutputPin(FLOW_PORT,FLOW_PIN);
     }
 }
-void ligth_do_control(u8 enable){
+void ligth1_do_control(u8 enable){
     if(enable){
         LL_GPIO_SetOutputPin(LIGTH_PORT,LIGTH_PIN);
     }else{
@@ -413,18 +437,16 @@ void ligth2_do_control(u8 enable){
  * @param value - [0;100]
  * */
 void set_pwm_value(float value){
-#if TRIGER_CONTROL_WITHOUT_PWM == 0
     u16 pulse = 0;
-
     static u16 pulse_prev = MAX_PWM_VALUE+1;
     value = value > 100.0f?100.0f:value;
     value = value < 0.0f?0.0f:value;
     value = value/100.0f;
     TIM_OC_InitTypeDef pwm_handle;
     pwm_handle.OCMode = TIM_OCMODE_PWM1;
-    if(value == 100.0f){
+    if(value >= 0.95f){
         pulse = MAX_PWM_VALUE;
-    }else if(value == 0.0f){
+    }else if(value <= 0.2f){
         pulse = 0;
     }else{
         pulse = (u16)(MAX_PWM_VALUE * value);
@@ -439,7 +461,14 @@ void set_pwm_value(float value){
         HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
         pulse_prev = pulse;
     }
-#else
+}
+
+/**
+ * @brief set pwm output
+ * @param value - [0;100]
+ * */
+void set_controller_value(float value){
+#if TRIGER_CONTROL_WITHOUT_PWM
     if(value > 0){
         LL_GPIO_SetOutputPin(PID_OUT_PORT_0, PID_OUT_PIN_0);
         LL_GPIO_SetOutputPin(PID_OUT_PORT_1, PID_OUT_PIN_1);
@@ -451,10 +480,10 @@ void set_pwm_value(float value){
         LL_GPIO_ResetOutputPin(PID_OUT_PORT_2, PID_OUT_PIN_2);
         LL_GPIO_ResetOutputPin(PID_OUT_PORT_3, PID_OUT_PIN_3);
     }
-
+#else
+    set_pwm_value(value);
 #endif
 }
-
 #define IntegralAccum -25
 void pid_exec(pid_in_type * FBInputs,pid_var_type * FBVars,\
                   pid_out_type * FBOutputs) {
@@ -516,6 +545,15 @@ void pid_exec(pid_in_type * FBInputs,pid_var_type * FBVars,\
     //выдаем значение на выход
     OUT->output.data.float32 = VAR->prev_control_integral.data.float32 ;
 }
-
+void soft_state_control(void){
+    switch(soft_ligth1_state){
+    case SOFT_DISABLE:
+        break;
+    case SOFT_AWAKE:
+        break;
+    case SOFT_SLEEP:
+        break;
+    }
+}
 
 #endif //CONTROL_C

@@ -70,9 +70,9 @@ static osThreadId own_task_id;
 
 #if FEEDER
 static osThreadId step_task_id;
-#else
-static osThreadId ds18_task_id,control_task_id;
 #endif
+static osThreadId ds18_task_id,control_task_id;
+
 
 
 
@@ -112,12 +112,12 @@ int main(void){
 #if FEEDER
     osThreadDef(step_task, step_task, osPriorityNormal, 0, 364);
     step_task_id = osThreadCreate(osThread(step_task), NULL);
-#else
+#endif
     osThreadDef(ds18_task, ds18_task, osPriorityHigh, 0, 364);
     ds18_task_id = osThreadCreate(osThread(ds18_task), NULL);
     osThreadDef(control_task, control_task, osPriorityNormal, 0, 364);
     control_task_id = osThreadCreate(osThread(control_task), NULL);
-#endif
+
     /* Start scheduler */
     osKernelStart();
     while (1)  { }
