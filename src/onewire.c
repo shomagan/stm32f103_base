@@ -88,7 +88,7 @@ uint8_t OneWire_Reset(OneWire_t* OneWireStruct) {
     if (i>=100){
         i=1;
     }
-    ONEWIRE_DELAY(390);
+    ONEWIRE_DELAY(800);
 	/* Return value of presence pulse, 0 = OK, 1 = ERROR */
 	return i;
 }
