@@ -113,7 +113,7 @@ int main(void){
     osThreadDef(step_task, step_task, osPriorityNormal, 0, 364);
     step_task_id = osThreadCreate(osThread(step_task), NULL);
 #endif
-    osThreadDef(ds18_task, ds18_task, osPriorityHigh, 0, 364);
+    osThreadDef(ds18_task, ds18_task, osPriorityNormal, 0, 364);
     ds18_task_id = osThreadCreate(osThread(ds18_task), NULL);
     osThreadDef(control_task, control_task, osPriorityNormal, 0, 364);
     control_task_id = osThreadCreate(osThread(control_task), NULL);
@@ -267,10 +267,9 @@ static void MX_RTC_Init(void){
 
 /* TIM3 init function */
 static void MX_TIM3_Init(void){
-    TIM_ClockConfigTypeDef sClockSourceConfig;
+    TIM_ClockConfigTypeDef sClockSourceConfig = {0};
     TIM_MasterConfigTypeDef sMasterConfig;
     TIM_OC_InitTypeDef pwm_handle;
-#if TRIGER_CONTROL_WITHOUT_PWM == 0
     htim3.Instance = TIM3;
     htim3.Init.Prescaler = 0;
     htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
@@ -299,7 +298,6 @@ static void MX_TIM3_Init(void){
     if (HAL_TIM_PWM_ConfigChannel(&htim3, &pwm_handle, TIM_CHANNEL_1) != HAL_OK)  {
         _Error_Handler(__FILE__, __LINE__);
     }
-#endif
     HAL_TIM_MspPostInit(&htim3);
 }
 
@@ -424,18 +422,21 @@ void own_task(void const * argument){
 }
 /* TIM2 init function */
 static void MX_TIM2_Init(void){
-    TIM_ClockConfigTypeDef sClockSourceConfig;
+    TIM_ClockConfigTypeDef sClockSourceConfig={0};
     TIM_MasterConfigTypeDef sMasterConfig;
     htim2.Instance = TIM2;
     htim2.Init.Prescaler = 71;
     htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-    htim2.Init.Period = 65000;
+    htim2.Init.Period = 65500;
     htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
     if (HAL_TIM_Base_Init(&htim2) != HAL_OK)  {
         _Error_Handler(__FILE__, __LINE__);
     }
+    sClockSourceConfig.ClockFilter = 0;
+    sClockSourceConfig.ClockPrescaler = 0;
     sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+    sClockSourceConfig.ClockPolarity = TIM_CLOCKPOLARITY_NONINVERTED;
     if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)  {
         _Error_Handler(__FILE__, __LINE__);
     }

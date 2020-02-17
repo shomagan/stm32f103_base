@@ -1,4 +1,4 @@
-/**	
+﻿/**	
  * |----------------------------------------------------------------------
  * | Copyright (C) Tilen Majerle, 2014
  * | 
@@ -22,21 +22,17 @@
 #include "main.h"
 
 
-void ONEWIRE_DELAY(uint16_t time_us)
-{
+void ONEWIRE_DELAY(uint16_t time_us){
 	_DS18B20_TIMER.Instance->CNT = 0;
 	while(_DS18B20_TIMER.Instance->CNT <= time_us);
 }
-void ONEWIRE_LOW(OneWire_t *gp)
-{
+void ONEWIRE_LOW(OneWire_t *gp){
 	gp->GPIOx->BSRR = gp->GPIO_Pin<<16;
 }	
-void ONEWIRE_HIGH(OneWire_t *gp)
-{
+void ONEWIRE_HIGH(OneWire_t *gp){
 	gp->GPIOx->BSRR = gp->GPIO_Pin;
 }	
-void ONEWIRE_INPUT(OneWire_t *gp)
-{
+void ONEWIRE_INPUT(OneWire_t *gp){
 	GPIO_InitTypeDef	gpinit;
 	gpinit.Mode = GPIO_MODE_INPUT;
 	gpinit.Pull = GPIO_NOPULL;
@@ -44,47 +40,55 @@ void ONEWIRE_INPUT(OneWire_t *gp)
 	gpinit.Pin = gp->GPIO_Pin;
 	HAL_GPIO_Init(gp->GPIOx,&gpinit);
 }	
-void ONEWIRE_OUTPUT(OneWire_t *gp)
-{
+void ONEWIRE_OUTPUT(OneWire_t *gp){
 	GPIO_InitTypeDef	gpinit;
-	gpinit.Mode = GPIO_MODE_OUTPUT_OD;
+    gpinit.Mode = GPIO_MODE_OUTPUT_PP;
 	gpinit.Pull = GPIO_NOPULL;
 	gpinit.Speed = GPIO_SPEED_FREQ_MEDIUM;
 	gpinit.Pin = gp->GPIO_Pin;
 	HAL_GPIO_Init(gp->GPIOx,&gpinit);
 
 }
-void one_wire_init(OneWire_t* OneWireStruct, GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin) 
-{	
+void one_wire_init(OneWire_t* OneWireStruct, GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin) {	
 	HAL_TIM_Base_Start(&_DS18B20_TIMER);
-
 	OneWireStruct->GPIOx = GPIOx;
 	OneWireStruct->GPIO_Pin = GPIO_Pin;
 	ONEWIRE_OUTPUT(OneWireStruct);
 	ONEWIRE_HIGH(OneWireStruct);
-	osDelay(1000);
+    osDelay(1000);
 	ONEWIRE_LOW(OneWireStruct);
-	osDelay(1000);
+    osDelay(1000);
 	ONEWIRE_HIGH(OneWireStruct);
-	osDelay(2000);
+    osDelay(2000);
 }
 
 uint8_t OneWire_Reset(OneWire_t* OneWireStruct) {
-	uint8_t i;
-	
+    uint8_t i=0;
 	/* Line low, and wait 480us */
-	ONEWIRE_LOW(OneWireStruct);
-	ONEWIRE_OUTPUT(OneWireStruct);
-	ONEWIRE_DELAY(480);
-	ONEWIRE_DELAY(20);
+    ONEWIRE_OUTPUT(OneWireStruct);
+    ONEWIRE_HIGH(OneWireStruct);
+    ONEWIRE_DELAY(100);
+    ONEWIRE_LOW(OneWireStruct);
+    ONEWIRE_DELAY(640);
+    ONEWIRE_HIGH(OneWireStruct);
+    ONEWIRE_DELAY(5);
+
 	/* Release line and wait for 70us */
 	ONEWIRE_INPUT(OneWireStruct);
-	ONEWIRE_DELAY(70);
+
 	/* Check bit value */
-	i = HAL_GPIO_ReadPin(OneWireStruct->GPIOx, OneWireStruct->GPIO_Pin);
-	
-	/* Delay for 410 us */
-	ONEWIRE_DELAY(410);
+    for (uint16_t j=0;j<100;j++){
+        if (!HAL_GPIO_ReadPin(OneWireStruct->GPIOx, OneWireStruct->GPIO_Pin)){
+            i =0;
+            break;
+        }else{
+            ONEWIRE_DELAY(10);
+        }
+    }
+    if (i>=100){
+        i=1;
+    }
+    ONEWIRE_DELAY(390);
 	/* Return value of presence pulse, 0 = OK, 1 = ERROR */
 	return i;
 }
@@ -201,21 +205,17 @@ uint8_t OneWire_Search(OneWire_t* OneWireStruct, uint8_t command) {
 	search_result = 0;
 
 	// if the last call was not the last one
-	if (!OneWireStruct->LastDeviceFlag)
-	{
+	if (!OneWireStruct->LastDeviceFlag)	{
 		// 1-Wire reset
-		if (OneWire_Reset(OneWireStruct)) 
-		{
+        if (OneWire_Reset(OneWireStruct)) {
 			/* Reset the search */
 			OneWireStruct->LastDiscrepancy = 0;
 			OneWireStruct->LastDeviceFlag = 0;
 			OneWireStruct->LastFamilyDiscrepancy = 0;
 			return 0;
 		}
-
 		// issue the search command 
 		OneWire_WriteByte(OneWireStruct, command);  
-
 		// loop to do the search
 		do {
 			// read a bit and its complement
@@ -227,7 +227,7 @@ uint8_t OneWire_Search(OneWire_t* OneWireStruct, uint8_t command) {
 				break;
 			} else {
 				// all devices coupled have 0 or 1
-				if (id_bit != cmp_id_bit) {
+                if (id_bit != cmp_id_bit) {
 					search_direction = id_bit;  // bit write value for search
 				} else {
 					// if this discrepancy if before the Last Discrepancy

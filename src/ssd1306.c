@@ -22,6 +22,7 @@
  */
 #include "ssd1306.h"
 #include "i2c.h"
+#include "cmsis_os.h"
 /* Write command */
 #define SSD1306_WRITECOMMAND(command)      ssd1306_I2C_Write(SSD1306_I2C_ADDR, 0x00, (command))
 /* Write data */
@@ -30,7 +31,7 @@
 #define ABS(x)   ((x) > 0 ? (x) : -(x))
 
 /* SSD1306 data buffer */
-static uint8_t SSD1306_Buffer[SSD1306_WIDTH * SSD1306_HEIGHT / 8];
+static uint8_t SSD1306_Buffer[(SSD1306_WIDTH * SSD1306_HEIGHT) / 8];
 
 
 
@@ -110,9 +111,8 @@ void SSD1306_UpdateScreen(void) {
             SSD1306_WRITECOMMAND(0xB0 + m);
             SSD1306_WRITECOMMAND(0x00);
             SSD1306_WRITECOMMAND(0x10);
-
             /* Write multi data */
-            ssd1306_I2C_WriteMulti(SSD1306_I2C_ADDR, 0x40, &SSD1306_Buffer[SSD1306_WIDTH * m], SSD1306_WIDTH);
+            ssd1306_I2C_WriteMulti(SSD1306_I2C_ADDR, 0x40, &SSD1306_Buffer[(SSD1306_WIDTH) * m], SSD1306_WIDTH);
         }
     }
 }
@@ -506,8 +506,7 @@ void ssd1306_I2C_Init() {
 void ssd1306_I2C_WriteMulti(uint8_t address, uint8_t reg, uint8_t* data, uint16_t count) {
     uint8_t dt[SSD1306_WIDTH + 1];
 	dt[0] = reg;
-	uint8_t i;
-    for(i = 1; i <= count; i++){
+    for(uint16_t i = 1; i < (count+1); i++){
 		dt[i] = data[i-1];
     }
     if(HAL_I2C_Master_Transmit(&hi2c1, address, dt, count+1, 100) != HAL_OK){

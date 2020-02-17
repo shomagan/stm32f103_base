@@ -139,29 +139,15 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim_base){
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef* htim){
   GPIO_InitTypeDef GPIO_InitStruct;
-#if TRIGER_CONTROL_WITHOUT_PWM == 0
-  if(htim->Instance==TIM3)  {
-    /**TIM3 GPIO Configuration
-    PA6     ------> TIM3_CH1
-    */
-
-    GPIO_InitStruct.Pin = PID_OUT_PIN_HAL;
+  if(htim->Instance==TIM3){
+    /**TIM3 GPIO Configuration PA6------> TIM3_CH1*/
+    GPIO_InitStruct.Pin = PID_OUT_PIN_0;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    HAL_GPIO_Init(PID_OUT_PORT, &GPIO_InitStruct);
+    HAL_GPIO_Init(PID_OUT_PORT_0, &GPIO_InitStruct);
   }
-#else
-  LL_GPIO_SetPinMode(PID_OUT_PORT_0, PID_OUT_PIN_0, LL_GPIO_MODE_OUTPUT);
-  LL_GPIO_SetPinOutputType(PID_OUT_PORT_0, PID_OUT_PIN_0, LL_GPIO_OUTPUT_PUSHPULL);
-  LL_GPIO_SetPinMode(PID_OUT_PORT_1, PID_OUT_PIN_1, LL_GPIO_MODE_OUTPUT);
-  LL_GPIO_SetPinOutputType(PID_OUT_PORT_1, PID_OUT_PIN_1, LL_GPIO_OUTPUT_PUSHPULL);
-  LL_GPIO_SetPinMode(PID_OUT_PORT_2, PID_OUT_PIN_2, LL_GPIO_MODE_OUTPUT);
-  LL_GPIO_SetPinOutputType(PID_OUT_PORT_2, PID_OUT_PIN_2, LL_GPIO_OUTPUT_PUSHPULL);
   LL_GPIO_SetPinMode(PID_OUT_PORT_3, PID_OUT_PIN_3, LL_GPIO_MODE_OUTPUT);
   LL_GPIO_SetPinOutputType(PID_OUT_PORT_3, PID_OUT_PIN_3, LL_GPIO_OUTPUT_PUSHPULL);
-
-#endif
-
 }
 
 void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* htim_base){

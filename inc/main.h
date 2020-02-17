@@ -55,16 +55,6 @@
 #define PID_OUT_PORT_0 GPIOA
 #define PID_OUT_PIN_0 LL_GPIO_PIN_6
 #define PID_OUT_PIN_HAL_0 GPIO_PIN_6
-#define PID_OUT_PORT_1 GPIOA
-#define PID_OUT_PIN_1 LL_GPIO_PIN_11
-#define PID_OUT_PIN_HAL_1 GPIO_PIN_11
-#define PID_OUT_PORT_2 GPIOA
-#define PID_OUT_PIN_2 LL_GPIO_PIN_12
-#define PID_OUT_PIN_HAL_2 GPIO_PIN_12
-#define PID_OUT_PORT_3 GPIOB
-#define PID_OUT_PIN_3 LL_GPIO_PIN_6
-#define PID_OUT_PIN_HAL_3 GPIO_PIN_6
-
 
 #define AIR_PORT GPIOA
 #define AIR_PIN  LL_GPIO_PIN_7
@@ -84,7 +74,7 @@
  * PA10     ------> USART1_RX
  */
 
-/*port b*/
+/*port b */
 #define	DS18B20_GPIO  GPIOB
 #define	DS18B20_PIN   GPIO_PIN_15
 #define I2C1_SCL_PORT GPIOB
@@ -96,6 +86,10 @@
 #define STEP_OUT2_1 LL_GPIO_PIN_11
 #define STEP_OUT2_2 LL_GPIO_PIN_12
 #define STEP_PORT GPIOB
+#define PID_OUT_PORT_3 GPIOB
+#define PID_OUT_PIN_3 LL_GPIO_PIN_6
+#define PID_OUT_PIN_HAL_3 GPIO_PIN_6
+/*port c */
 #define LED_PORT GPIOC
 #define LED_PIN  LL_GPIO_PIN_13
 

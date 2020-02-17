@@ -324,7 +324,7 @@ static void tusb_otg_core_init(tusb_core_t* core)
     // 1. Init the IO
     tusb_setup_otg_fs_io();
     // 2. Init the interrupt
-    NVIC_SetPriority(OTG_FS_IRQn, 0);
+    HAL_NVIC_SetPriority(OTG_FS_IRQn, 15, 0);
     NVIC_EnableIRQ(OTG_FS_IRQn);
     // 3. Init the core
     __HAL_RCC_USB_OTG_FS_CLK_ENABLE();
@@ -343,8 +343,7 @@ static void tusb_otg_core_init(tusb_core_t* core)
     // 2. Setup Interrupt
 #if defined(OTG_HS_EMBEDDED_PHY)
     tusb_setup_otg_hs_io();
-    
-    NVIC_SetPriority(OTG_HS_IRQn, 0);
+    HAL_NVIC_SetPriority(OTG_HS_IRQn, 15, 0);
     NVIC_EnableIRQ(OTG_HS_IRQn);
     
     __HAL_RCC_OTGPHYC_CLK_ENABLE();
@@ -365,8 +364,7 @@ static void tusb_otg_core_init(tusb_core_t* core)
     set_io_af_mode( OTG_HS_ULPI_STP );
     set_io_af_mode( OTG_HS_ULPI_NXT );
     set_io_af_mode( OTG_HS_ULPI_CK );
-    
-    NVIC_SetPriority(OTG_HS_IRQn, 0);
+    HAL_NVIC_SetPriority(OTG_HS_IRQn, 15, 0);
     NVIC_EnableIRQ(OTG_HS_IRQn);
     
     __HAL_RCC_USB_OTG_HS_CLK_ENABLE();

@@ -223,11 +223,13 @@ void control_task( const void *parameters){
             SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE);
             int temp;
             value = out.output.data.float32 >= 0.0f?out.output.data.float32:0.0f;
-            value = value <= 75.0f?value:75.0f;
             set_controller_value(value);
             in.position.data.float32 = out.output.data.float32;
-            temp = (int)in.position.data.float32;
+            temp = (int)in.current_value.data.float32;
             itoa(temp,buff,10);
+            SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE);
+            buff[0] = ' ';buff[1] = 'C';buff[2] = ' ';buff[3] = ' ';buff[4] = ' ';
+            buff[5] = ' ';
             SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE);
             SSD1306_UpdateScreen();
         }else{
@@ -275,7 +277,12 @@ u8 check_state_machine(){
     SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
     itoa(time.Seconds,buff,10);
     SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+    for (u8 i=0;i<5;i++){
+        buff[i] = ' ';
+    }
+    SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
     SSD1306_UpdateScreen();
+
 
     if((time.Hours==0) && (time.Minutes==0)){
         flow.stop_time = 0;
@@ -468,21 +475,11 @@ void set_pwm_value(float value){
  * @param value - [0;100]
  * */
 void set_controller_value(float value){
-#if TRIGER_CONTROL_WITHOUT_PWM
-    if(value > 0){
-        LL_GPIO_SetOutputPin(PID_OUT_PORT_0, PID_OUT_PIN_0);
-        LL_GPIO_SetOutputPin(PID_OUT_PORT_1, PID_OUT_PIN_1);
-        LL_GPIO_SetOutputPin(PID_OUT_PORT_2, PID_OUT_PIN_2);
+    if(value > 0.0f){
         LL_GPIO_SetOutputPin(PID_OUT_PORT_3, PID_OUT_PIN_3);
     }else{
-        LL_GPIO_ResetOutputPin(PID_OUT_PORT_0, PID_OUT_PIN_0);
-        LL_GPIO_ResetOutputPin(PID_OUT_PORT_1, PID_OUT_PIN_1);
-        LL_GPIO_ResetOutputPin(PID_OUT_PORT_2, PID_OUT_PIN_2);
         LL_GPIO_ResetOutputPin(PID_OUT_PORT_3, PID_OUT_PIN_3);
     }
-#else
-    set_pwm_value(value);
-#endif
 }
 #define IntegralAccum -25
 void pid_exec(pid_in_type * FBInputs,pid_var_type * FBVars,\
