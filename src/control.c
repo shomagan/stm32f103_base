@@ -41,9 +41,6 @@
 #ifndef CONTROL_C
 #define CONTROL_C 1
 #include "control.h"
-#include "FreeRTOS.h"
-#include "task.h"
-#include "semphr.h"
 #include "cmsis_os.h"
 #include "ds18.h"
 #include "ssd1306.h"
@@ -105,15 +102,21 @@ static void air_do_control(u8 enable);
 static void flow_do_control(u8 enable);
 static void ligth1_do_control(u8 enable);
 void ligth2_do_control(u8 enable);
-static void soft_state_control(void);
+
 typedef enum{
     SOFT_DISABLE,
     SOFT_AWAKE,
     SOFT_SLEEP,
 }soft_state_t;
-static soft_state_t soft_ligth1_state = SOFT_DISABLE;
+static void soft_state_control(soft_state_t command);
+static soft_state_t soft_state = SOFT_DISABLE;
 const static u16 SOFT_TIME_INTERVAL_MS = 10000;
+static u32 soft_time_start = 0;
 static u16 soft_time_interval = 0;
+static osThreadId soft_handle_task_id;
+
+static void soft_handle_task( const void *parameters);
+
 typedef struct __attribute__((__packed__)){
     u16 number;
     u32 stop_time;  //in seconde
@@ -197,13 +200,14 @@ void control_task( const void *parameters){
     HAL_IWDG_Refresh(&hiwdg);
     SSD1306_Init();
     HAL_IWDG_Refresh(&hiwdg);
-    //SSD1306_DrawCircle(10, 33, 7, SSD1306_COLOR_WHITE,0.5);
     SSD1306_UpdateScreen();
     taskEXIT_CRITICAL();
     flow.stop_time = 0;
     ligth1.stop_time = 0;
     ligth2.stop_time = 0;
     air.stop_time = 0;
+    osThreadDef(soft_handle_task, soft_handle_task, osPriorityNormal, 0, configMINIMAL_STACK_SIZE);
+    soft_handle_task_id = osThreadCreate(osThread(soft_handle_task), NULL);
     while(1){
         //ds18_time = osKernelSysTick();
         u8 sensor_data_valid;
@@ -293,6 +297,7 @@ u8 check_state_machine(){
         flow_do_control(0);
         ligth1_do_control(0);
         ligth2_do_control(0);
+        soft_state_control(SOFT_DISABLE);
     }else{
         u32 current_sec = time.Hours*3600 + time.Minutes*60 + time.Seconds;
         if(air.stop_time < current_sec){
@@ -355,11 +360,13 @@ u8 check_state_machine(){
                     ligth2.stop_time = temp_sec + time_table_ligth2[i].length;
                     ligth2.number = i;
                     ligth2_do_control(1);
+                    soft_state_control(SOFT_AWAKE);
                     break;
                 }
                 if(i>=item_number){
                     ligth2.number = i;
                     ligth2.stop_time =0;
+                    soft_state_control(SOFT_SLEEP);
                 }
             }
         }
@@ -398,6 +405,8 @@ u8 check_state_machine(){
         }
         if(ligth2.stop_time <= current_sec){
             ligth2_do_control(0);
+            soft_state_control(SOFT_DISABLE);
+            soft_state_control(SOFT_AWAKE);
             SSD1306_DrawCircle(53, 33, 7, SSD1306_COLOR_BLACK,1.0);
             SSD1306_UpdateScreen();
         }else{
@@ -407,7 +416,7 @@ u8 check_state_machine(){
             SSD1306_UpdateScreen();
         }
     }
-    soft_state_control();
+
     return 0x00;
 }
 void air_do_control(u8 enable){
@@ -426,9 +435,9 @@ void flow_do_control(u8 enable){
 }
 void ligth1_do_control(u8 enable){
     if(enable){
-        LL_GPIO_SetOutputPin(LIGTH_PORT,LIGTH_PIN);
+        LL_GPIO_SetOutputPin(LIGTH1_PORT,LIGTH1_PIN);
     }else{
-        LL_GPIO_ResetOutputPin(LIGTH_PORT,LIGTH_PIN);
+        LL_GPIO_ResetOutputPin(LIGTH1_PORT,LIGTH1_PIN);
     }
 }
 void ligth2_do_control(u8 enable){
@@ -542,15 +551,63 @@ void pid_exec(pid_in_type * FBInputs,pid_var_type * FBVars,\
     //выдаем значение на выход
     OUT->output.data.float32 = VAR->prev_control_integral.data.float32 ;
 }
-void soft_state_control(void){
-    switch(soft_ligth1_state){
-    case SOFT_DISABLE:
-        break;
-    case SOFT_AWAKE:
-        break;
-    case SOFT_SLEEP:
-        break;
+
+void soft_state_control(soft_state_t command){
+    u32 current_time = osKernelSysTick();
+    soft_state = command;
+    if(command && ((current_time-soft_time_start)>=SOFT_TIME_INTERVAL_MS)){
+        soft_time_start = current_time;
+    }
+    if ((current_time-soft_time_start)<SOFT_TIME_INTERVAL_MS){
+        float value_pwm;
+        switch(command){
+        case SOFT_DISABLE:
+            set_pwm_value(0.0);
+            if(osThreadIsSuspended(soft_handle_task_id)!=osOK){
+                osThreadSuspend(soft_handle_task_id);
+            }
+            break;
+        case SOFT_AWAKE:
+            value_pwm = ((current_time-soft_time_start)/SOFT_TIME_INTERVAL_MS)*100;
+            set_pwm_value(value_pwm);
+            if(osThreadIsSuspended(soft_handle_task_id)==osOK){
+                osThreadResume(soft_handle_task_id);
+            }
+            break;
+        case SOFT_SLEEP:
+            value_pwm = ((SOFT_TIME_INTERVAL_MS-(current_time-soft_time_start))/SOFT_TIME_INTERVAL_MS)*100;
+            set_pwm_value(value_pwm);
+            if(osThreadIsSuspended(soft_handle_task_id)==osOK){
+                osThreadResume(soft_handle_task_id);
+            }
+            break;
+        }
     }
 }
-
+static void soft_handle_task( const void *parameters){
+    uint32_t task_time = osKernelSysTick();
+    osThreadId thread_id;
+    thread_id = osThreadGetId();
+    osThreadSuspend(thread_id);
+    while(1){
+        u32 current_time = osKernelSysTick();
+        if ((current_time-soft_time_start)<SOFT_TIME_INTERVAL_MS){
+            float value_pwm;
+            switch(soft_state){
+            case SOFT_DISABLE:
+                set_pwm_value(0.0);
+                break;
+            case SOFT_AWAKE:
+                value_pwm = ((current_time-soft_time_start)/SOFT_TIME_INTERVAL_MS)*100;
+                set_pwm_value(value_pwm);
+                break;
+            case SOFT_SLEEP:
+                value_pwm = ((SOFT_TIME_INTERVAL_MS-(current_time-soft_time_start))/SOFT_TIME_INTERVAL_MS)*100;
+                set_pwm_value(value_pwm);
+                break;
+            }
+        }
+        osDelayUntil(&task_time,1);
+    }
+}
 #endif //CONTROL_C
