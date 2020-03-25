@@ -110,7 +110,7 @@ typedef enum{
 }soft_state_t;
 static void soft_state_control(soft_state_t command);
 static soft_state_t soft_state = SOFT_DISABLE;
-const static u16 SOFT_TIME_INTERVAL_MS = 10000;
+const static u16 SOFT_TIME_INTERVAL_MS = 20000;
 static u32 soft_time_start = 0;
 static u16 soft_time_interval = 0;
 static osThreadId soft_handle_task_id;
@@ -351,22 +351,30 @@ u8 check_state_machine(){
                 }
             }
         }
-        if(ligth2.stop_time < current_sec){
+        if(ligth2.stop_time <= current_sec){
             item_number = sizeof(time_table_ligth2)/sizeof (time_table_t);
             for (u16 i=0;i<item_number;i++){
                 temp_sec = time_table_ligth2[i].start_time*60;
                 if((current_sec >= temp_sec) &&
-                    (current_sec <=(temp_sec + time_table_ligth2[i].length))){
-                    ligth2.stop_time = temp_sec + time_table_ligth2[i].length;
+                    (current_sec <=(temp_sec + time_table_ligth2[i].length))&&
+                    (current_sec <(temp_sec + time_table_ligth2[i].length - SOFT_TIME_INTERVAL_MS/1000))){
+                    ligth2.stop_time = temp_sec + time_table_ligth2[i].length - SOFT_TIME_INTERVAL_MS/1000;
                     ligth2.number = i;
                     ligth2_do_control(1);
                     soft_state_control(SOFT_AWAKE);
                     break;
                 }
+                if((current_sec >= temp_sec) &&
+                    (current_sec <=(temp_sec + time_table_ligth2[i].length))&&
+                    (current_sec >=(temp_sec + time_table_ligth2[i].length - SOFT_TIME_INTERVAL_MS/1000))){
+                    ligth2.stop_time = temp_sec + time_table_ligth2[i].length;
+                    soft_state_control(SOFT_SLEEP);
+                    break;
+                }
                 if(i>=item_number){
                     ligth2.number = i;
-                    ligth2.stop_time =0;
-                    soft_state_control(SOFT_SLEEP);
+                    ligth2.stop_time = 0;
+                    soft_state_control(SOFT_DISABLE);
                 }
             }
         }
@@ -406,7 +414,6 @@ u8 check_state_machine(){
         if(ligth2.stop_time <= current_sec){
             ligth2_do_control(0);
             soft_state_control(SOFT_DISABLE);
-            soft_state_control(SOFT_AWAKE);
             SSD1306_DrawCircle(53, 33, 7, SSD1306_COLOR_BLACK,1.0);
             SSD1306_UpdateScreen();
         }else{
@@ -460,9 +467,9 @@ void set_pwm_value(float value){
     value = value/100.0f;
     TIM_OC_InitTypeDef pwm_handle;
     pwm_handle.OCMode = TIM_OCMODE_PWM1;
-    if(value >= 0.95f){
+    if(value >= 0.99f){
         pulse = MAX_PWM_VALUE;
-    }else if(value <= 0.2f){
+    }else if(value <= 0.01f){
         pulse = 0;
     }else{
         pulse = (u16)(MAX_PWM_VALUE * value);
@@ -568,14 +575,14 @@ void soft_state_control(soft_state_t command){
             }
             break;
         case SOFT_AWAKE:
-            value_pwm = ((current_time-soft_time_start)/SOFT_TIME_INTERVAL_MS)*100;
+            value_pwm = (((current_time-soft_time_start)*100)/SOFT_TIME_INTERVAL_MS);
             set_pwm_value(value_pwm);
             if(osThreadIsSuspended(soft_handle_task_id)==osOK){
                 osThreadResume(soft_handle_task_id);
             }
             break;
         case SOFT_SLEEP:
-            value_pwm = ((SOFT_TIME_INTERVAL_MS-(current_time-soft_time_start))/SOFT_TIME_INTERVAL_MS)*100;
+            value_pwm = (((SOFT_TIME_INTERVAL_MS-(current_time-soft_time_start))*100)/SOFT_TIME_INTERVAL_MS);
             set_pwm_value(value_pwm);
             if(osThreadIsSuspended(soft_handle_task_id)==osOK){
                 osThreadResume(soft_handle_task_id);
@@ -598,11 +605,11 @@ static void soft_handle_task( const void *parameters){
                 set_pwm_value(0.0);
                 break;
             case SOFT_AWAKE:
-                value_pwm = ((current_time-soft_time_start)/SOFT_TIME_INTERVAL_MS)*100;
+                value_pwm = (((current_time-soft_time_start)*100)/SOFT_TIME_INTERVAL_MS);
                 set_pwm_value(value_pwm);
                 break;
             case SOFT_SLEEP:
-                value_pwm = ((SOFT_TIME_INTERVAL_MS-(current_time-soft_time_start))/SOFT_TIME_INTERVAL_MS)*100;
+                value_pwm = (((SOFT_TIME_INTERVAL_MS-(current_time-soft_time_start))*100)/SOFT_TIME_INTERVAL_MS);
                 set_pwm_value(value_pwm);
                 break;
             }

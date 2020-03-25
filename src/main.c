@@ -56,6 +56,7 @@
 #include "step.h"
 #include "main.h"
 #include "tusbd_cdc.h"
+#include "stm32f1xx_ll_tim.h"
 #define FEEDER 1
 #define ADC_USE 0
 
@@ -67,7 +68,7 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart1;
 static osThreadId own_task_id;
-
+sofi_vars_t sofi;
 #if FEEDER
 static osThreadId step_task_id;
 #endif
@@ -255,9 +256,9 @@ static void MX_RTC_Init(void){
     data = BKP->DR1;
     if(data!=data_c){
         BKP->DR1 = data_c;
-        sTime.Hours = 0x01;
-        sTime.Minutes = 0x01;
-        sTime.Seconds = 0x01;
+        sTime.Hours = 0x0d;
+        sTime.Minutes = 0x00;
+        sTime.Seconds = 0x00;
         if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK) {
             _Error_Handler(__FILE__, __LINE__);
         }
@@ -420,6 +421,8 @@ void own_task(void const * argument){
         }
     }
 }
+
+
 /* TIM2 init function */
 static void MX_TIM2_Init(void){
     TIM_ClockConfigTypeDef sClockSourceConfig={0};

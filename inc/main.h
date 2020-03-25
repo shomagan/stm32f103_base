@@ -50,6 +50,9 @@
 /* Define to prevent recursive inclusion -------------------------------------*/
 #ifndef __MAIN_H__
 #define __MAIN_H__
+#include "type_def.h"
+#define SOFI_MONITOR 1
+#define MONITOR_MAX_TASKS 10
 /*port a*/
 #define TRIGER_CONTROL_WITHOUT_PWM 1
 #define PID_OUT_PORT_0 GPIOA
@@ -99,6 +102,41 @@ extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim3;
 extern UART_HandleTypeDef huart1;
 extern TIM_HandleTypeDef htim1;
+#define GLOBAL_UNION_SIZE 64
+/*
+ * @brief name variables uses for name in description file and then in get value by name
+ * and therefore use max size len name is 16 charackter
+ * @coment style : "" - description
+ *                  &ro  - read only
+ *                  &def -> have const varibale with struct like def_name
+ *                  &save- will have saved in bkram
+ *
+ * */
+typedef union{
+    struct MCU_PACK{
+        u32 cur_free_heap;              //!< in bytes,&ro
+        u32 min_free_heap;              //!< in bytes,&ro
+        u8 debug_info[8];               //!<"reserved use for debug"
+        //add new regs after ->
+        u8 user_task_state;             //!<"user task current state",&ro
+        u16 user_task_config;           //!<"user task config",
+        //add new regs before <-
+        u32 monitor_period;             //!< "sofi_monitor period in ms",&ro
+        float total_tasks_time;         //!< "sum of running times of tasks in %",&ro
+    }vars;
+    u8 bytes[GLOBAL_UNION_SIZE]; //for full bksram copy
+}sofi_vars_t;
+typedef struct {
+    u8 task_number;
+    u32 last_time;
+    float percentage;
+}task_time_t;
+typedef enum {
+    ERROR_OK = 0,
+    ERROR_INIT = -1
+}error_t;
+
+extern sofi_vars_t sofi;
 
 
 /* ########################## Assert Selection ############################## */
