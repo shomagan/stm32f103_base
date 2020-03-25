@@ -20,11 +20,14 @@
 #include "onewire.h"
 #include "ds18_config.h"
 #include "main.h"
-
+#include "stm32f1xx_ll_tim.h"
 
 void ONEWIRE_DELAY(uint16_t time_us){
-	_DS18B20_TIMER.Instance->CNT = 0;
-	while(_DS18B20_TIMER.Instance->CNT <= time_us);
+    LL_TIM_SetCounter(TIM2, 0);
+    LL_TIM_EnableCounter(TIM2);
+    while(_DS18B20_TIMER.Instance->CNT <= time_us){
+    }
+    LL_TIM_DisableCounter(TIM2);
 }
 void ONEWIRE_LOW(OneWire_t *gp){
 	gp->GPIOx->BSRR = gp->GPIO_Pin<<16;
@@ -58,7 +61,7 @@ void one_wire_init(OneWire_t* OneWireStruct, GPIO_TypeDef* GPIOx, uint16_t GPIO_
     osDelay(1000);
 	ONEWIRE_LOW(OneWireStruct);
     osDelay(1000);
-	ONEWIRE_HIGH(OneWireStruct);
+    ONEWIRE_HIGH(OneWireStruct);
     osDelay(2000);
 }
 

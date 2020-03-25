@@ -7,7 +7,7 @@
 #define _DS18B20_MAX_SENSORS		    				7
 
 
-#define	_DS18B20_UPDATE_INTERVAL_MS					1000					//  (((	if==0  >> Ds18b20_ManualConvert()  )))    ((( if>0  >>>> Auto refresh )))
+#define	_DS18B20_UPDATE_INTERVAL_MS					2000					//  (((	if==0  >> Ds18b20_ManualConvert()  )))    ((( if>0  >>>> Auto refresh )))
 #define	_DS18B20_CONVERT_TIMEOUT_MS					1000
 
 #define	_DS18B20_TIMER											htim2						

@@ -65,6 +65,7 @@ void ds18_task( const void *parameters){
     (void)parameters;
     ds18_time = xTaskGetTickCount();
     //infinity find device
+    one_wire_init(&one_wire,DS18B20_GPIO ,DS18B20_PIN);
     find_device();
     error_read_counter = 0;
     while(1){
@@ -74,7 +75,9 @@ void ds18_task( const void *parameters){
             find_device();
         }
         ds18b20_timeout=_DS18B20_CONVERT_TIMEOUT_MS;
+        taskENTER_CRITICAL();
         ds18b20_start_calc(&one_wire);
+        taskEXIT_CRITICAL();
         while (!ds18b20_calc_done(&one_wire)){
             osDelay(1);
             ds18b20_timeout-=1;
@@ -108,16 +111,20 @@ void ds18_task( const void *parameters){
  *
  * */
 static uint8_t find_device(){
+    osDelay(250);
     do	{
-        one_wire_init(&one_wire,DS18B20_GPIO ,DS18B20_PIN);
         temp_sensor_count = 0;
-        osDelay(250);
+        taskENTER_CRITICAL();
         one_wire_devices = one_wire_first(&one_wire);
+        taskEXIT_CRITICAL();
         while (one_wire_devices){
             temp_sensor_count++;
             osDelay(250);
             one_wire_get_full_rom(&one_wire, ds18b20[temp_sensor_count-1].Address);
+            taskENTER_CRITICAL();
             one_wire_devices = one_wire_next(&one_wire);
+            taskEXIT_CRITICAL();
+
         }
         if(temp_sensor_count>0){
             break;

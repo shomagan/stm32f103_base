@@ -181,6 +181,7 @@ static const time_table_t time_table_air[] = {
 static state_machine flow,ligth1,ligth2,air;
 void control_task( const void *parameters){
     u32 tick=0;
+    u32 time;
     pid_in_type in;
     pid_var_type var;
     pid_out_type out;
@@ -197,18 +198,18 @@ void control_task( const void *parameters){
     in.kd.data.float32 = -100.0f;
     in.position.data.float32 = DEFAULT_OUT;
     in.gist_tube.data.float32 = 0.5f;
-    taskENTER_CRITICAL();
     HAL_IWDG_Refresh(&hiwdg);
-    SSD1306_Init();
     HAL_IWDG_Refresh(&hiwdg);
-    SSD1306_UpdateScreen();
-    taskEXIT_CRITICAL();
     flow.stop_time = 0;
     ligth1.stop_time = 0;
     ligth2.stop_time = 0;
     air.stop_time = 0;
     osThreadDef(soft_handle_task, soft_handle_task, osPriorityNormal, 0, configMINIMAL_STACK_SIZE);
     soft_handle_task_id = osThreadCreate(osThread(soft_handle_task), NULL);
+    osDelay(1);
+    time = osKernelSysTick();
+    SSD1306_Init();
+    SSD1306_UpdateScreen();
     while(1){
         //ds18_time = osKernelSysTick();
         u8 sensor_data_valid;
@@ -220,6 +221,14 @@ void control_task( const void *parameters){
             }
         }
         pid_exec(&in,&var,&out);
+        if(SSD1306.error_num){
+            SSD1306.Initialized = 0;
+        }
+        if((tick % 5) == 0){
+            if(!SSD1306.Initialized ){
+                SSD1306_Init();
+            }
+        }
         if(data_valid) {
             static float value;
             char buff[32] = "temp - ";
@@ -245,50 +254,41 @@ void control_task( const void *parameters){
             set_controller_value(DEFAULT_OUT);
             in.position.data.float32 = DEFAULT_OUT;	    	// float - необходимое положение регулятора в процентах
         }
-        if(SSD1306.error_num){
-            SSD1306.Initialized = 0;
+        RTC_TimeTypeDef time;
+        HAL_RTC_GetTime(&hrtc,&time,RTC_FORMAT_BIN);
+        SSD1306_GotoXY(0, 0); //Устанавливаем курсор в позицию 0;44. Сначала по горизонтали, потом вертикали.
+        char buff[32] = "time ";
+        buff[7] = 0;
+        SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+        itoa(time.Hours,buff,10);
+        SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+        buff[0] = 0x3a ;// ":"
+        buff[1] = 0 ;// ":"
+        SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+        itoa(time.Minutes,buff,10);
+        SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+        buff[0] = 0x3a ;// ":"
+        buff[1] = 0 ;// ":"
+        SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+        itoa(time.Seconds,buff,10);
+        SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+        for (u8 i=0;i<5;i++){
+            buff[i] = ' ';
         }
-        if((tick % 5) == 0){
-            if(!SSD1306.Initialized ){
-                SSD1306_Init();
-            }
-        }
+        SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+        SSD1306_UpdateScreen();
         check_state_machine();
-        osDelay(1000);
         HAL_IWDG_Refresh(&hiwdg);
-        //osDelayUntil(&ds18_time,_DS18B20_UPDATE_INTERVAL_MS);
+        osDelayUntil(&time,1000);
     }
 }
 u8 check_state_machine(){
     u16 item_number;
-    RTC_TimeTypeDef time;
     u32 temp_sec;
     u16 i;
     LL_GPIO_TogglePin(LED_PORT, LED_PIN);
+    RTC_TimeTypeDef time;
     HAL_RTC_GetTime(&hrtc,&time,RTC_FORMAT_BIN);
-    SSD1306_GotoXY(0, 0); //Устанавливаем курсор в позицию 0;44. Сначала по горизонтали, потом вертикали.
-    char buff[32] = "time ";
-    buff[7] = 0;
-    SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
-    itoa(time.Hours,buff,10);
-    SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
-    buff[0] = 0x3a ;// ":"
-    buff[1] = 0 ;// ":"
-    SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
-    itoa(time.Minutes,buff,10);
-    SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
-    buff[0] = 0x3a ;// ":"
-    buff[1] = 0 ;// ":"
-    SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
-    itoa(time.Seconds,buff,10);
-    SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
-    for (u8 i=0;i<5;i++){
-        buff[i] = ' ';
-    }
-    SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
-    SSD1306_UpdateScreen();
-
-
     if((time.Hours==0) && (time.Minutes==0)){
         flow.stop_time = 0;
         ligth1.stop_time = 0;
