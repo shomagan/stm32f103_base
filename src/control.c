@@ -107,6 +107,7 @@ typedef enum{
     SOFT_DISABLE,
     SOFT_AWAKE,
     SOFT_SLEEP,
+    SOFT_SUSPEND,
 }soft_state_t;
 static void soft_state_control(soft_state_t command);
 static soft_state_t soft_state = SOFT_DISABLE;
@@ -356,20 +357,25 @@ u8 check_state_machine(){
             for (u16 i=0;i<item_number;i++){
                 temp_sec = time_table_ligth2[i].start_time*60;
                 if((current_sec >= temp_sec) &&
-                    (current_sec <=(temp_sec + time_table_ligth2[i].length))&&
-                    (current_sec <(temp_sec + time_table_ligth2[i].length - SOFT_TIME_INTERVAL_MS/1000))){
-                    ligth2.stop_time = temp_sec + time_table_ligth2[i].length - SOFT_TIME_INTERVAL_MS/1000;
+                    (current_sec <(temp_sec + SOFT_TIME_INTERVAL_MS/1000))){
+                    ligth2.stop_time = temp_sec + SOFT_TIME_INTERVAL_MS/1000;
                     ligth2.number = i;
                     ligth2_do_control(1);
                     soft_state_control(SOFT_AWAKE);
                     break;
-                }
-                if((current_sec >= temp_sec) &&
-                    (current_sec <=(temp_sec + time_table_ligth2[i].length))&&
-                    (current_sec >=(temp_sec + time_table_ligth2[i].length - SOFT_TIME_INTERVAL_MS/1000))){
+                }else if((current_sec >= (temp_sec + SOFT_TIME_INTERVAL_MS/1000)) &&
+                         (current_sec <(temp_sec + time_table_ligth2[i].length - SOFT_TIME_INTERVAL_MS/1000))){
+                    ligth2.stop_time = temp_sec + time_table_ligth2[i].length - SOFT_TIME_INTERVAL_MS/1000;
+                    ligth2.number = i;
+                    ligth2_do_control(1);
+                    set_pwm_value(100.0);
+                    soft_state_control(SOFT_SUSPEND);
+                }else if((current_sec >= (temp_sec + time_table_ligth2[i].length - SOFT_TIME_INTERVAL_MS/1000)) &&
+                         (current_sec <(temp_sec + time_table_ligth2[i].length))){
                     ligth2.stop_time = temp_sec + time_table_ligth2[i].length;
+                    ligth2.number = i;
+                    ligth2_do_control(1);
                     soft_state_control(SOFT_SLEEP);
-                    break;
                 }
                 if(i>=item_number){
                     ligth2.number = i;
@@ -411,7 +417,7 @@ u8 check_state_machine(){
             SSD1306_UpdateScreen();
 
         }
-        if(ligth2.stop_time <= current_sec){
+        if(ligth2.stop_time < current_sec){
             ligth2_do_control(0);
             soft_state_control(SOFT_DISABLE);
             SSD1306_DrawCircle(53, 33, 7, SSD1306_COLOR_BLACK,1.0);
@@ -561,15 +567,20 @@ void pid_exec(pid_in_type * FBInputs,pid_var_type * FBVars,\
 
 void soft_state_control(soft_state_t command){
     u32 current_time = osKernelSysTick();
-    soft_state = command;
-    if(command && ((current_time-soft_time_start)>=SOFT_TIME_INTERVAL_MS)){
+    if(soft_state != command){
+        soft_state = command;
         soft_time_start = current_time;
     }
     if ((current_time-soft_time_start)<SOFT_TIME_INTERVAL_MS){
         float value_pwm;
-        switch(command){
+        switch(soft_state){
         case SOFT_DISABLE:
             set_pwm_value(0.0);
+            if(osThreadIsSuspended(soft_handle_task_id)!=osOK){
+                osThreadSuspend(soft_handle_task_id);
+            }
+            break;
+        case SOFT_SUSPEND:
             if(osThreadIsSuspended(soft_handle_task_id)!=osOK){
                 osThreadSuspend(soft_handle_task_id);
             }
