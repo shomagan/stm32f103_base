@@ -91,6 +91,7 @@ void DebugMon_Handler(void){
 * @brief This function handles System tick timer.
 */
 void SysTick_Handler(void){
+  HAL_IncTick();
   osSystickHandler();
 }
 
@@ -104,8 +105,19 @@ void SysTick_Handler(void){
 /**
 * @brief This function handles RTC global interrupt.
 */
+static u32 test = 0;
 void RTC_IRQHandler(void){
   HAL_RTCEx_RTCIRQHandler(&hrtc);
+  test++;
+}
+/**
+  * @brief  This function handles RTC Alarm interrupt request.
+  * @param  None
+  * @retval None
+  */
+void RTC_Alarm_IRQHandler(void){
+  HAL_RTC_AlarmIRQHandler(&hrtc);
+
 }
 
 /**
@@ -121,7 +133,7 @@ void USBWakeUp_IRQHandler(void){
 }
 
 /**
-* @brief This function handles TIM1 update interrupt.
+* @brief This function handles TIM1 update interrupt. using hal lib
 */
 void TIM1_UP_IRQHandler(void){
   HAL_TIM_IRQHandler(&htim1);

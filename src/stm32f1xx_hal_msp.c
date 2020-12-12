@@ -104,15 +104,6 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* hadc){
 
 void HAL_RTC_MspInit(RTC_HandleTypeDef* hrtc){
   if(hrtc->Instance==RTC)  {
-    __HAL_RCC_BKP_CLK_ENABLE();
-    __HAL_RCC_PWR_CLK_ENABLE();
-    HAL_PWR_EnableBkUpAccess();
-    /* Enable BKP CLK enable for backup registers */
-    /* Peripheral clock enable */
-    __HAL_RCC_RTC_ENABLE();
-    /* RTC interrupt Init */
-    HAL_NVIC_SetPriority(RTC_IRQn, 5, 0);
-    HAL_NVIC_EnableIRQ(RTC_IRQn);
   }
 }
 

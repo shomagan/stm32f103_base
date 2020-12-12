@@ -1,418 +1,368 @@
-﻿/**	
- * |----------------------------------------------------------------------
- * | Copyright (C) Tilen Majerle, 2014
- * | 
- * | This program is free software: you can redistribute it and/or modify
- * | it under the terms of the GNU General Public License as published by
- * | the Free Software Foundation, either version 3 of the License, or
- * | any later version.
- * |  
- * | This program is distributed in the hope that it will be useful,
- * | but WITHOUT ANY WARRANTY; without even the implied warranty of
- * | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * | GNU General Public License for more details.
- * | 
- * | You should have received a copy of the GNU General Public License
- * | along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * |----------------------------------------------------------------------
- */
-#include "stm32f1xx_hal.h"
+#ifndef ONEWIRE_C
+#define ONEWIRE_C 1
 #include "onewire.h"
-#include "ds18_config.h"
+
+#include "string.h"
 #include "main.h"
 #include "stm32f1xx_ll_tim.h"
+// Low-level 1-Wire routines
+#ifndef DEBUG
+#define DEBUG 0
+#endif
+#define SEARCH_ROM 0xF0
+#define MATCH_ROM 0x55
+#define SKIP_ROM 0xCC
+#define ONEWIRE_CONVERT 0x44
+#define RD_SCRATCH 0xBE
+#define WR_SCRATCH 0x4E
 
-void ONEWIRE_DELAY(uint16_t time_us){
+#define TIMING_RESET1 (480)
+#define TIMING_RESET2 (70)
+#define TIMING_RESET3 (410)
+#define TIMING_READ1 (5)
+#define TIMING_READ2 (5)
+#define TIMING_READ3 (40)
+#define TIMING_WRITE1 (10)
+#define TIMING_WRITE2 (50)
+#define TIMING_WRITE3 (10)
+
+
+#define DS18B20_DATA_BUFF_SIZE 9
+#define DS18B20_DECIMAL_STEPS_12BIT		0.0625f
+#define DS18B20_DECIMAL_STEPS_11BIT		0.125f
+#define DS18B20_DECIMAL_STEPS_10BIT		0.25f
+#define DS18B20_DECIMAL_STEPS_9BIT		0.5f
+
+static int onewire_bus_reset(onewire_device_description_t * onewire_device_description);
+static int onewire_bus_writebit(onewire_device_description_t * onewire_device_description, u8 value);
+static u8 onewire_bus_readbit(onewire_device_description_t * onewire_device_description);
+int onewire_writebyte(onewire_device_description_t * onewire_device_description, u8 value_in);
+static u8 onewire_readbyte(onewire_device_description_t * onewire_device_description);
+static int onewire_write(onewire_device_description_t * onewire_device_description, u8 * buff, u16 len);
+static int select_rom(onewire_device_description_t * onewire_device_description, u16 len);
+static int search_rom(onewire_device_description_t * onewire_device_description, int diff);
+static int scan(onewire_device_description_t * onewire_device_description);
+static int convert_temp(onewire_device_description_t * onewire_device_description);
+static int readinto(onewire_device_description_t * onewire_device_description, u8 * buf, u16 len);
+static int read_scratch(onewire_device_description_t * onewire_device_description,u8 * read_buff);
+static float read_temp(onewire_device_description_t * onewire_device_description);
+static u8 onewire_crc8(u8 * data,u32 data_len);
+osThreadId ds18_id;
+static u8 device_rom[ONEWIRE_ROM_SIZE*ONE_WIRE_MAX_DEVICE_NUMBER];
+static onewire_device_description_t onewire_device_descriptions[ONE_WIRE_MAX_DEVICE_NUMBER];
+ds18b20sensor_t	ds18b20[ONE_WIRE_MAX_DEVICE_NUMBER];
+#define TIME_YIELD_THRESHOLD 100
+void delay_us(uint16_t time_us){
+    u16 gap = 0;
     LL_TIM_SetCounter(TIM2, 0);
     LL_TIM_EnableCounter(TIM2);
-    while(_DS18B20_TIMER.Instance->CNT <= time_us){
-    }
-    LL_TIM_DisableCounter(TIM2);
-}
-void ONEWIRE_LOW(OneWire_t *gp){
-	gp->GPIOx->BSRR = gp->GPIO_Pin<<16;
-}	
-void ONEWIRE_HIGH(OneWire_t *gp){
-	gp->GPIOx->BSRR = gp->GPIO_Pin;
-}	
-void ONEWIRE_INPUT(OneWire_t *gp){
-	GPIO_InitTypeDef	gpinit;
-	gpinit.Mode = GPIO_MODE_INPUT;
-	gpinit.Pull = GPIO_NOPULL;
-	gpinit.Speed = GPIO_SPEED_FREQ_MEDIUM;
-	gpinit.Pin = gp->GPIO_Pin;
-	HAL_GPIO_Init(gp->GPIOx,&gpinit);
-}	
-void ONEWIRE_OUTPUT(OneWire_t *gp){
-	GPIO_InitTypeDef	gpinit;
-    gpinit.Mode = GPIO_MODE_OUTPUT_PP;
-	gpinit.Pull = GPIO_NOPULL;
-	gpinit.Speed = GPIO_SPEED_FREQ_MEDIUM;
-	gpinit.Pin = gp->GPIO_Pin;
-	HAL_GPIO_Init(gp->GPIOx,&gpinit);
-
-}
-void one_wire_init(OneWire_t* OneWireStruct, GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin) {	
-	HAL_TIM_Base_Start(&_DS18B20_TIMER);
-	OneWireStruct->GPIOx = GPIOx;
-	OneWireStruct->GPIO_Pin = GPIO_Pin;
-	ONEWIRE_OUTPUT(OneWireStruct);
-	ONEWIRE_HIGH(OneWireStruct);
-    osDelay(1000);
-	ONEWIRE_LOW(OneWireStruct);
-    osDelay(1000);
-    ONEWIRE_HIGH(OneWireStruct);
-    osDelay(2000);
-}
-
-uint8_t OneWire_Reset(OneWire_t* OneWireStruct) {
-    uint8_t i=0;
-	/* Line low, and wait 480us */
-    ONEWIRE_OUTPUT(OneWireStruct);
-    ONEWIRE_HIGH(OneWireStruct);
-    ONEWIRE_DELAY(100);
-    ONEWIRE_LOW(OneWireStruct);
-    ONEWIRE_DELAY(640);
-    ONEWIRE_HIGH(OneWireStruct);
-    ONEWIRE_DELAY(5);
-
-	/* Release line and wait for 70us */
-	ONEWIRE_INPUT(OneWireStruct);
-
-	/* Check bit value */
-    for (uint16_t j=0;j<100;j++){
-        if (!HAL_GPIO_ReadPin(OneWireStruct->GPIOx, OneWireStruct->GPIO_Pin)){
-            i =0;
-            break;
-        }else{
-            ONEWIRE_DELAY(10);
+    while(htim2.Instance->CNT <= time_us){
+        if(htim2.Instance->CNT > (gap+TIME_YIELD_THRESHOLD)){
+            gap = (u16)htim2.Instance->CNT;
+            osThreadYield();
         }
     }
-    if (i>=100){
-        i=1;
+    LL_TIM_DisableCounter(TIM2);
+    return;
+}
+void ds18_task( const void *parameters){
+    TickType_t ds18_time;
+    int device_connected;
+    int errors_num = 0;
+    (void)parameters;
+    for (u8 i=0;i<ONE_WIRE_MAX_DEVICE_NUMBER;i++){
+        onewire_device_descriptions[i].pin = DS18B20_PIN;
+        onewire_device_descriptions[i].port =  DS18B20_GPIO;
+        memset(onewire_device_descriptions[i].device_rom,0,ONEWIRE_ROM_SIZE);
     }
-    ONEWIRE_DELAY(800);
-	/* Return value of presence pulse, 0 = OK, 1 = ERROR */
-	return i;
+    ds18_time = xTaskGetTickCount();
+    device_connected = scan(&onewire_device_descriptions[0]);
+    if(device_connected>0){
+        //main_printf("onewire devices number - %u\n", device_connected);
+    }else{
+        //main_printf("onewire devices has not found");
+    }
+
+    while(1){
+        if (errors_num<ONE_WIRE_MAX_ERROR_NUM && device_connected>0){
+            if(convert_temp(&onewire_device_descriptions[0])){
+                errors_num++;
+            }
+            osDelay(750);
+            float temp;
+            temp = read_temp(&onewire_device_descriptions[0]);
+            if(temp > -90.0f){
+                ds18b20[0].temperature = temp;
+                ds18b20[0].data_validate = 1;
+                errors_num = 0;
+            }else{
+                errors_num++;
+            }
+#if DEBUG
+            main_printf("ds18b20 temp = %f", regs_global.vars.temperature_out);
+#endif
+        }else{
+            ds18b20[0].data_validate = 0;
+            osDelay(750);
+            device_connected = scan(&onewire_device_descriptions[0]);
+            if(device_connected>0){
+                errors_num = 0;
+            }
+        }
+    }
+}
+static float    read_temp(onewire_device_description_t * onewire_device_description){
+    u8 read_buff[DS18B20_DATA_BUFF_SIZE];
+    float res = -99.0f;
+    if (read_scratch(onewire_device_description, read_buff)==0){
+        if(onewire_device_description->device_rom[0]==0x10){  //ds18s20
+            u8 t = 0;
+            if (read_buff[1]){
+                t = (read_buff[0] >> 1) | 0x80;
+                t = -((~t + 1) & 0xFF);
+            }else{
+                t = read_buff[0] >> 1;
+            }
+            s8 t2;
+            memcpy(&t2,&t,1);
+            return ((float)(t2) - 0.25f + (float)((read_buff[7] - read_buff[6]) / read_buff[7]));
+        }else{  //ds18b20
+            u8 resolution = ((read_buff[4] & 0x60) >> 5) + 9;
+            u8 negative = 0;
+#if DEBUG
+            main_printf("resolution %u", resolution);
+#endif
+            u16 blank = (u16)(read_buff[1] << 8) | read_buff[0];
+            if (blank & 0x8000){  // sign bit set
+                negative = 1;
+                blank = ~blank + 1;
+            }
+
+            u16 digit = (blank & 0x7ff)/16;
+            float decimal = 0.0f;
+
+            switch (resolution) {
+                case 9:
+                    decimal = (blank >> 3) & 0x01;
+                    decimal *= (float)DS18B20_DECIMAL_STEPS_9BIT;
+                break;
+                case 10:
+                    decimal = (blank >> 2) & 0x03;
+                    decimal *= (float)DS18B20_DECIMAL_STEPS_10BIT;
+                 break;
+                case 11:
+                    decimal = (blank >> 1) & 0x07;
+                    decimal *= (float)DS18B20_DECIMAL_STEPS_11BIT;
+                break;
+                case 12:
+                    decimal = blank & 0x0F;
+                    decimal *= (float)DS18B20_DECIMAL_STEPS_12BIT;
+                 break;
+                default:
+                    decimal = 0xFF;
+                    digit = 0;
+            }
+            res = digit + decimal;
+            if (negative){  // sign bit set
+                res = 0.0f - res;
+            }
+            return res;
+        }
+    }else{
+        res = -99.0f;
+    }
+    return res;
 }
 
-void OneWire_WriteBit(OneWire_t* OneWireStruct, uint8_t bit) {
-	if (bit) 
-	{
-		/* Set line low */
-		ONEWIRE_LOW(OneWireStruct);
-		ONEWIRE_OUTPUT(OneWireStruct);
-		ONEWIRE_DELAY(10);
-		
-		/* Bit high */
-		ONEWIRE_INPUT(OneWireStruct);
-		
-		/* Wait for 55 us and release the line */
-		ONEWIRE_DELAY(55);
-		ONEWIRE_INPUT(OneWireStruct);
-	} 
-	else 
-	{
-		/* Set line low */
-		ONEWIRE_LOW(OneWireStruct);
-		ONEWIRE_OUTPUT(OneWireStruct);
-		ONEWIRE_DELAY(65);
-		
-		/* Bit high */
-		ONEWIRE_INPUT(OneWireStruct);
-		
-		/* Wait for 5 us and release the line */
-		ONEWIRE_DELAY(5);
-		ONEWIRE_INPUT(OneWireStruct);
-	}
+static int read_scratch(onewire_device_description_t * onewire_device_description,u8 * read_buff){
+    int res =0;
+    if(onewire_bus_reset(onewire_device_description)){
+        select_rom(onewire_device_description, ONEWIRE_ROM_SIZE);
+        onewire_writebyte(onewire_device_description, RD_SCRATCH);
+        readinto(onewire_device_description, read_buff, DS18B20_DATA_BUFF_SIZE);
+        if (onewire_crc8(read_buff, DS18B20_DATA_BUFF_SIZE)){
+            res = -2;
+        }
 
+    }else{
+        res =-1;
+    }
+    return res;
 }
 
-uint8_t OneWire_ReadBit(OneWire_t* OneWireStruct) 
-{
-	uint8_t bit = 0;
-	
-	/* Line low */
-	ONEWIRE_LOW(OneWireStruct);
-	ONEWIRE_OUTPUT(OneWireStruct);
-	ONEWIRE_DELAY(2);
-	
-	/* Release line */
-	ONEWIRE_INPUT(OneWireStruct);
-	ONEWIRE_DELAY(10);
-	
-	/* Read line value */
-	if (HAL_GPIO_ReadPin(OneWireStruct->GPIOx, OneWireStruct->GPIO_Pin)) {
-		/* Bit is HIGH */
-		bit = 1;
-	}
-	
-	/* Wait 50us to complete 60us period */
-	ONEWIRE_DELAY(50);
-	
-	/* Return bit value */
-	return bit;
+static int convert_temp(onewire_device_description_t * onewire_device_description){
+    int res = 0;
+    if(onewire_bus_reset(onewire_device_description)){
+        onewire_writebyte(onewire_device_description, SKIP_ROM);
+        onewire_writebyte(onewire_device_description, ONEWIRE_CONVERT);
+    }else{
+        res = -1;
+    }
+    return res;
 }
 
-void OneWire_WriteByte(OneWire_t* OneWireStruct, uint8_t byte) {
-	uint8_t i = 8;
-	/* Write 8 bits */
-	while (i--) {
-		/* LSB bit is first */
-		OneWire_WriteBit(OneWireStruct, byte & 0x01);
-		byte >>= 1;
-	}
+static int scan(onewire_device_description_t * onewire_device_description){
+    int devices = 0;
+    int diff = 65;
+    memset(device_rom,0,ONEWIRE_ROM_SIZE*ONE_WIRE_MAX_DEVICE_NUMBER);
+    for (u16 i =0 ;i<ONE_WIRE_MAX_DEVICE_NUMBER;i++){
+        diff = search_rom(&onewire_device_description[i], diff);
+        if (diff>=0){
+            devices += 1;
+        }
+        if (diff<1){
+            break;
+        }
+    }
+    return devices;
 }
 
-uint8_t OneWire_ReadByte(OneWire_t* OneWireStruct) {
-	uint8_t i = 8, byte = 0;
-	while (i--) {
-		byte >>= 1;
-		byte |= (OneWire_ReadBit(OneWireStruct) << 7);
-	}
-	
-	return byte;
+static int search_rom(onewire_device_description_t * onewire_device_description,int diff){
+    int next_diff = 0;
+    u8 rom_old[ONEWIRE_ROM_SIZE] = {0};
+    for (u8 i =0;i<ONEWIRE_ROM_SIZE;i++){
+        rom_old[i] = onewire_device_description->device_rom[i];
+    }
+
+    if(onewire_bus_reset(onewire_device_description)){
+        onewire_writebyte(onewire_device_description, SEARCH_ROM);
+        u8 i = 64;
+        for (u8 byte=0;byte<8;byte++){
+            u8 r_b;
+            r_b = 0;
+            for(u8 bit = 0;bit<8;bit++){
+                u8 b;
+                b = onewire_bus_readbit(onewire_device_description);
+                if (onewire_bus_readbit(onewire_device_description)){
+                    if (b){  //there are no devices or there is an error on the bus
+                        for (u8 i =0;i<ONEWIRE_ROM_SIZE;i++){
+                            onewire_device_description->device_rom[i] = 0;
+                        }
+                        next_diff = -1;
+                        return next_diff;
+                    }
+                }else{
+                    if (!b){  // collision, two devices with different bit meaning
+                        if ((diff > i) || ((rom_old[byte] & (1 << bit)) && (diff != i))){
+                            b = 1;
+                            next_diff = i;
+                        }
+                    }
+                }
+                onewire_bus_writebit(onewire_device_description, b);
+                if (b){
+                    r_b |= (1 << bit);
+                }
+                i -= 1;
+            }
+            onewire_device_description->device_rom[byte] = r_b;
+        }
+        return next_diff;
+    }else{
+        next_diff = -1;
+    }
+    return next_diff;
+}
+static int select_rom(onewire_device_description_t * onewire_device_description, u16 len){
+    onewire_bus_reset(onewire_device_description);
+    onewire_writebyte(onewire_device_description, MATCH_ROM);
+    return onewire_write(onewire_device_description, onewire_device_description->device_rom, len);
+}
+static int readinto(onewire_device_description_t * onewire_device_description, u8 * buf, u16 len){
+    int res = 0;
+    for (u16 i=0;i<len;i++){
+        buf[i] = onewire_readbyte(onewire_device_description);
+    }
+    return res;
 }
 
-uint8_t one_wire_first(OneWire_t* OneWireStruct) {
-	/* Reset search values */
-	OneWire_ResetSearch(OneWireStruct);
-
-	/* Start with searching */
-	return OneWire_Search(OneWireStruct, ONEWIRE_CMD_SEARCHROM);
+static int onewire_write(onewire_device_description_t * onewire_device_description, u8 * buff, u16 len){
+    int res = 0;
+    for (u16 i=0;i<len;i++){
+        res = onewire_writebyte(onewire_device_description, buff[i]);
+        if(res<0){
+            break;
+        }
+    }
+    return res;
 }
 
-uint8_t one_wire_next(OneWire_t* OneWireStruct) {
-   /* Leave the search state alone */
-   return OneWire_Search(OneWireStruct, ONEWIRE_CMD_SEARCHROM);
+static int onewire_bus_reset(onewire_device_description_t * onewire_device_description) {
+    int status;
+    HAL_GPIO_WritePin(onewire_device_description->port, onewire_device_description->pin,GPIO_PIN_RESET);
+    delay_us(TIMING_RESET1);
+    HAL_GPIO_WritePin(onewire_device_description->port, onewire_device_description->pin,GPIO_PIN_SET);
+    delay_us(TIMING_RESET2);
+    status = !HAL_GPIO_ReadPin(onewire_device_description->port, onewire_device_description->pin);
+    delay_us(TIMING_RESET3);
+    return status;
 }
 
-void OneWire_ResetSearch(OneWire_t* OneWireStruct) {
-	/* Reset the search state */
-	OneWireStruct->LastDiscrepancy = 0;
-	OneWireStruct->LastDeviceFlag = 0;
-	OneWireStruct->LastFamilyDiscrepancy = 0;
+static u8 onewire_bus_readbit(onewire_device_description_t * onewire_device_description) {
+    u8 value = 0;
+    HAL_GPIO_WritePin(onewire_device_description->port, onewire_device_description->pin,GPIO_PIN_SET);
+    HAL_GPIO_WritePin(onewire_device_description->port, onewire_device_description->pin,GPIO_PIN_RESET);
+    delay_us(TIMING_READ1);
+    HAL_GPIO_WritePin(onewire_device_description->port, onewire_device_description->pin,GPIO_PIN_SET);
+    delay_us(TIMING_READ2);
+    if (HAL_GPIO_ReadPin(onewire_device_description->port, onewire_device_description->pin)==GPIO_PIN_SET){
+        value = 1;
+    }
+    delay_us(TIMING_READ3);
+    return value;
 }
 
-uint8_t OneWire_Search(OneWire_t* OneWireStruct, uint8_t command) {
-	uint8_t id_bit_number;
-	uint8_t last_zero, rom_byte_number, search_result;
-	uint8_t id_bit, cmp_id_bit;
-	uint8_t rom_byte_mask, search_direction;
-
-	/* Initialize for search */
-	id_bit_number = 1;
-	last_zero = 0;
-	rom_byte_number = 0;
-	rom_byte_mask = 1;
-	search_result = 0;
-
-	// if the last call was not the last one
-	if (!OneWireStruct->LastDeviceFlag)	{
-		// 1-Wire reset
-        if (OneWire_Reset(OneWireStruct)) {
-			/* Reset the search */
-			OneWireStruct->LastDiscrepancy = 0;
-			OneWireStruct->LastDeviceFlag = 0;
-			OneWireStruct->LastFamilyDiscrepancy = 0;
-			return 0;
-		}
-		// issue the search command 
-		OneWire_WriteByte(OneWireStruct, command);  
-		// loop to do the search
-		do {
-			// read a bit and its complement
-			id_bit = OneWire_ReadBit(OneWireStruct);
-			cmp_id_bit = OneWire_ReadBit(OneWireStruct);
-
-			// check for no devices on 1-wire
-			if ((id_bit == 1) && (cmp_id_bit == 1)) {
-				break;
-			} else {
-				// all devices coupled have 0 or 1
-                if (id_bit != cmp_id_bit) {
-					search_direction = id_bit;  // bit write value for search
-				} else {
-					// if this discrepancy if before the Last Discrepancy
-					// on a previous next then pick the same as last time
-					if (id_bit_number < OneWireStruct->LastDiscrepancy) {
-						search_direction = ((OneWireStruct->ROM_NO[rom_byte_number] & rom_byte_mask) > 0);
-					} else {
-						// if equal to last pick 1, if not then pick 0
-						search_direction = (id_bit_number == OneWireStruct->LastDiscrepancy);
-					}
-					
-					// if 0 was picked then record its position in LastZero
-					if (search_direction == 0) {
-						last_zero = id_bit_number;
-
-						// check for Last discrepancy in family
-						if (last_zero < 9) {
-							OneWireStruct->LastFamilyDiscrepancy = last_zero;
-						}
-					}
-				}
-
-				// set or clear the bit in the ROM byte rom_byte_number
-				// with mask rom_byte_mask
-				if (search_direction == 1) {
-					OneWireStruct->ROM_NO[rom_byte_number] |= rom_byte_mask;
-				} else {
-					OneWireStruct->ROM_NO[rom_byte_number] &= ~rom_byte_mask;
-				}
-				
-				// serial number search direction write bit
-				OneWire_WriteBit(OneWireStruct, search_direction);
-
-				// increment the byte counter id_bit_number
-				// and shift the mask rom_byte_mask
-				id_bit_number++;
-				rom_byte_mask <<= 1;
-
-				// if the mask is 0 then go to new SerialNum byte rom_byte_number and reset mask
-				if (rom_byte_mask == 0) {
-					//docrc8(ROM_NO[rom_byte_number]);  // accumulate the CRC
-					rom_byte_number++;
-					rom_byte_mask = 1;
-				}
-			}
-		} while (rom_byte_number < 8);  // loop until through all ROM bytes 0-7
-
-		// if the search was successful then
-		if (!(id_bit_number < 65)) {
-			// search successful so set LastDiscrepancy,LastDeviceFlag,search_result
-			OneWireStruct->LastDiscrepancy = last_zero;
-
-			// check for last device
-			if (OneWireStruct->LastDiscrepancy == 0) {
-				OneWireStruct->LastDeviceFlag = 1;
-			}
-
-			search_result = 1;
-		}
-	}
-
-	// if no device found then reset counters so next 'search' will be like a first
-	if (!search_result || !OneWireStruct->ROM_NO[0]) {
-		OneWireStruct->LastDiscrepancy = 0;
-		OneWireStruct->LastDeviceFlag = 0;
-		OneWireStruct->LastFamilyDiscrepancy = 0;
-		search_result = 0;
-	}
-
-	return search_result;
+static int onewire_bus_writebit(onewire_device_description_t * onewire_device_description, u8 value) {
+    int res =0 ;
+    HAL_GPIO_WritePin(onewire_device_description->port, onewire_device_description->pin,GPIO_PIN_RESET);
+    delay_us(TIMING_WRITE1);
+    if (value & 1) {
+        HAL_GPIO_WritePin(onewire_device_description->port, onewire_device_description->pin,GPIO_PIN_SET);
+    }
+    delay_us(TIMING_WRITE2);
+    HAL_GPIO_WritePin(onewire_device_description->port, onewire_device_description->pin,GPIO_PIN_SET);
+    delay_us(TIMING_WRITE3);
+    return res;
 }
 
-int OneWire_Verify(OneWire_t* OneWireStruct) {
-	unsigned char rom_backup[8];
-	int i,rslt,ld_backup,ldf_backup,lfd_backup;
+/******************************************************************************/
+// MicroPython bindings
 
-	// keep a backup copy of the current state
-	for (i = 0; i < 8; i++)
-	rom_backup[i] = OneWireStruct->ROM_NO[i];
-	ld_backup = OneWireStruct->LastDiscrepancy;
-	ldf_backup = OneWireStruct->LastDeviceFlag;
-	lfd_backup = OneWireStruct->LastFamilyDiscrepancy;
 
-	// set search to find the same device
-	OneWireStruct->LastDiscrepancy = 64;
-	OneWireStruct->LastDeviceFlag = 0;
-
-	if (OneWire_Search(OneWireStruct, ONEWIRE_CMD_SEARCHROM)) {
-		// check if same device found
-		rslt = 1;
-		for (i = 0; i < 8; i++) {
-			if (rom_backup[i] != OneWireStruct->ROM_NO[i]) {
-				rslt = 1;
-				break;
-			}
-		}
-	} else {
-		rslt = 0;
-	}
-
-	// restore the search state 
-	for (i = 0; i < 8; i++) {
-		OneWireStruct->ROM_NO[i] = rom_backup[i];
-	}
-	OneWireStruct->LastDiscrepancy = ld_backup;
-	OneWireStruct->LastDeviceFlag = ldf_backup;
-	OneWireStruct->LastFamilyDiscrepancy = lfd_backup;
-
-	// return the result of the verify
-	return rslt;
+static u8 onewire_readbyte(onewire_device_description_t * onewire_device_description) {
+    uint8_t value = 0;
+    for (int i = 0; i < 8; ++i) {
+        value |= onewire_bus_readbit(onewire_device_description) << i;
+    }
+    return value;
 }
 
-void OneWire_TargetSetup(OneWire_t* OneWireStruct, uint8_t family_code) {
-   uint8_t i;
-
-	// set the search state to find SearchFamily type devices
-	OneWireStruct->ROM_NO[0] = family_code;
-	for (i = 1; i < 8; i++) {
-		OneWireStruct->ROM_NO[i] = 0;
-	}
-	
-	OneWireStruct->LastDiscrepancy = 64;
-	OneWireStruct->LastFamilyDiscrepancy = 0;
-	OneWireStruct->LastDeviceFlag = 0;
+int onewire_writebyte(onewire_device_description_t * onewire_device_description, u8 value_in) {
+    int res = 0;
+    for (int i = 0; i < 8; ++i) {
+        res = onewire_bus_writebit(onewire_device_description, value_in & 1);
+        value_in >>= 1;
+    }
+    return res;
 }
 
-void OneWire_FamilySkipSetup(OneWire_t* OneWireStruct) {
-	// set the Last discrepancy to last family discrepancy
-	OneWireStruct->LastDiscrepancy = OneWireStruct->LastFamilyDiscrepancy;
-	OneWireStruct->LastFamilyDiscrepancy = 0;
-
-	// check for end of list
-	if (OneWireStruct->LastDiscrepancy == 0) {
-		OneWireStruct->LastDeviceFlag = 1;
-	}
+static u8 onewire_crc8(u8 * data,u32 data_len) {
+    uint8_t crc = 0;
+    for (size_t i = 0; i < data_len; ++i) {
+        uint8_t byte = data[i];
+        for (int b = 0; b < 8; ++b) {
+            uint8_t fb_bit = (crc ^ byte) & 0x01;
+            if (fb_bit == 0x01) {
+                crc = crc ^ 0x18;
+            }
+            crc = (crc >> 1) & 0x7f;
+            if (fb_bit == 0x01) {
+                crc = crc | 0x80;
+            }
+            byte = byte >> 1;
+        }
+    }
+    return crc;
 }
 
-uint8_t OneWire_GetROM(OneWire_t* OneWireStruct, uint8_t index) {
-	return OneWireStruct->ROM_NO[index];
-}
-
-void OneWire_Select(OneWire_t* OneWireStruct, uint8_t* addr) {
-	uint8_t i;
-	OneWire_WriteByte(OneWireStruct, ONEWIRE_CMD_MATCHROM);
-	
-	for (i = 0; i < 8; i++) {
-		OneWire_WriteByte(OneWireStruct, *(addr + i));
-	}
-}
-
-void OneWire_SelectWithPointer(OneWire_t* OneWireStruct, uint8_t *ROM) {
-	uint8_t i;
-	OneWire_WriteByte(OneWireStruct, ONEWIRE_CMD_MATCHROM);
-	
-	for (i = 0; i < 8; i++) {
-		OneWire_WriteByte(OneWireStruct, *(ROM + i));
-	}	
-}
-
-void one_wire_get_full_rom(OneWire_t* OneWireStruct, uint8_t *firstIndex) {
-	uint8_t i;
-	for (i = 0; i < 8; i++) {
-		*(firstIndex + i) = OneWireStruct->ROM_NO[i];
-	}
-}
-
-uint8_t OneWire_CRC8(uint8_t *addr, uint8_t len) {
-	uint8_t crc = 0, inbyte, i, mix;
-	
-	while (len--) {
-		inbyte = *addr++;
-		for (i = 8; i; i--) {
-			mix = (crc ^ inbyte) & 0x01;
-			crc >>= 1;
-			if (mix) {
-				crc ^= 0x8C;
-			}
-			inbyte >>= 1;
-		}
-	}
-	
-	/* Return calculated CRC */
-	return crc;
-}
-
+#endif // ONEWIRE_C

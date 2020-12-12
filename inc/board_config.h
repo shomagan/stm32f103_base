@@ -48,7 +48,16 @@
 // #define  OTG_HS_ENABLE_DMA
 
 /* Support for other speed config and device qualifier descriptor */
+#define USB_USE 1
+#define RTC_USE 1
+#define ADC_USE 0
+#define UART_USE 1
+#define USE_GPIO_PORT_A 1
+#define USE_GPIO_PORT_B 1
+#define USE_GPIO_PORT_C 1
+#define USE_GPIO_PORT_D 1
 #define  SUPPORT_OTHER_SPEED
+#define IWDG_USE 1
 
 /* Setup descriptor buffer size, used for other speed config and DMA */
 #define  DESCRIPTOR_BUFFER_SIZE  256

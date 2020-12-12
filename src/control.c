@@ -42,7 +42,7 @@
 #define CONTROL_C 1
 #include "control.h"
 #include "cmsis_os.h"
-#include "ds18.h"
+#include "onewire.h"
 #include "ssd1306.h"
 #include "time_table.h"
 #include "stm32f1xx_ll_gpio.h"
@@ -215,10 +215,8 @@ void control_task( const void *parameters){
         u8 sensor_data_valid;
         tick++;
         sensor_data_valid = 0;
-        for (uint8_t i = 0; i < temp_sensor_count; i++){
-            if(ds18b20[i].data_validate) {
-                in.current_value.data.float32  = ds18b20[i].Temperature;
-            }
+        if(ds18b20[0].data_validate) {
+            in.current_value.data.float32  = ds18b20[0].temperature;
         }
         pid_exec(&in,&var,&out);
         if(SSD1306.error_num){
@@ -229,7 +227,7 @@ void control_task( const void *parameters){
                 SSD1306_Init();
             }
         }
-        if(data_valid) {
+        if(ds18b20[0].data_validate) {
             static float value;
             char buff[32] = "temp - ";
             buff[9] = 0;
@@ -254,23 +252,23 @@ void control_task( const void *parameters){
             set_controller_value(DEFAULT_OUT);
             in.position.data.float32 = DEFAULT_OUT;	    	// float - необходимое положение регулятора в процентах
         }
-        RTC_TimeTypeDef time;
-        HAL_RTC_GetTime(&hrtc,&time,RTC_FORMAT_BIN);
+        RTC_TimeTypeDef rtc_time;
+        HAL_RTC_GetTime(&hrtc,&rtc_time,RTC_FORMAT_BIN);
         SSD1306_GotoXY(0, 0); //Устанавливаем курсор в позицию 0;44. Сначала по горизонтали, потом вертикали.
         char buff[32] = "time ";
         buff[7] = 0;
         SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
-        itoa(time.Hours,buff,10);
+        itoa(rtc_time.Hours,buff,10);
         SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
         buff[0] = 0x3a ;// ":"
         buff[1] = 0 ;// ":"
         SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
-        itoa(time.Minutes,buff,10);
+        itoa(rtc_time.Minutes,buff,10);
         SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
         buff[0] = 0x3a ;// ":"
         buff[1] = 0 ;// ":"
         SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
-        itoa(time.Seconds,buff,10);
+        itoa(rtc_time.Seconds,buff,10);
         SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
         for (u8 i=0;i<5;i++){
             buff[i] = ' ';
@@ -279,14 +277,13 @@ void control_task( const void *parameters){
         SSD1306_UpdateScreen();
         check_state_machine();
         HAL_IWDG_Refresh(&hiwdg);
-        osDelayUntil(&time,1000);
+        osDelayUntil((uint32_t*)&time,1000);
     }
 }
 u8 check_state_machine(){
     u16 item_number;
     u32 temp_sec;
     u16 i;
-    LL_GPIO_TogglePin(LED_PORT, LED_PIN);
     RTC_TimeTypeDef time;
     HAL_RTC_GetTime(&hrtc,&time,RTC_FORMAT_BIN);
     if((time.Hours==0) && (time.Minutes==0)){

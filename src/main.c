@@ -50,15 +50,20 @@
 
 #include "stm32f1xx_hal.h"
 #include "cmsis_os.h"
-#include "ds18.h"
+#include "onewire.h"
 #include "control.h"
 #include "stm32f1xx_ll_gpio.h"
 #include "step.h"
 #include "main.h"
 #include "tusbd_cdc.h"
 #include "stm32f1xx_ll_tim.h"
-#define FEEDER 1
-#define ADC_USE 0
+#include "stm32f1xx_ll_rcc.h"
+#include "stm32f1xx_ll_bus.h"
+#include "stm32f1xx_ll_system.h"
+
+#if STEP_BOARD
+#include "step_board.h"
+#endif
 
 /* Private variables ---------------------------------------------------------*/
 static ADC_HandleTypeDef hadc1;
@@ -73,12 +78,14 @@ sofi_vars_t sofi;
 static osThreadId step_task_id;
 #endif
 static osThreadId ds18_task_id,control_task_id;
-
+#if STEP_BOARD
+static osThreadId step_board_task_id;
+#endif
 
 
 
 /* Private function prototypes -----------------------------------------------*/
-void SystemClock_Config(void);
+
 static void MX_GPIO_Init(void);
 static void MX_IWDG_Init(void);
 static void MX_RTC_Init(void);
@@ -86,10 +93,11 @@ static void MX_ADC1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
+static void RTC_AlarmConfig(void);
 void own_task(void const * argument);
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
-
+u8 stop_mode = 0;
 
 /**
   * @brief  The application entry point.
@@ -97,31 +105,52 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
   * @retval None
   */
 int main(void){
-    HAL_Init();
     SystemClock_Config();
+    HAL_Init();
     MX_GPIO_Init();
+#if IWDG_USE
     MX_IWDG_Init();
+#endif
+#if RTC_USE
     MX_RTC_Init();
+#endif
 #if ADC_USE
     MX_ADC1_Init();
 #endif
+#if UART_USE
     MX_USART1_UART_Init();
+#endif
+#if STEP_BOARD==0
     MX_TIM3_Init();
+#endif
     MX_TIM2_Init();
     osThreadDef(own_task, own_task, osPriorityNormal, 0, 364);
     own_task_id = osThreadCreate(osThread(own_task), NULL);
-#if FEEDER
-    osThreadDef(step_task, step_task, osPriorityNormal, 0, 364);
-    step_task_id = osThreadCreate(osThread(step_task), NULL);
-#endif
+
+#if STEP_BOARD
+    osThreadDef(step_board_task, step_board_task, osPriorityNormal, 0, 364);
+    step_board_task_id = osThreadCreate(osThread(step_board_task), NULL);
+
+#else
+    #if FEEDER
+        osThreadDef(step_task, step_task, osPriorityNormal, 0, 364);
+        step_task_id = osThreadCreate(osThread(step_task), NULL);
+    #endif
     osThreadDef(ds18_task, ds18_task, osPriorityNormal, 0, 364);
     ds18_task_id = osThreadCreate(osThread(ds18_task), NULL);
     osThreadDef(control_task, control_task, osPriorityNormal, 0, 364);
     control_task_id = osThreadCreate(osThread(control_task), NULL);
-
+#endif
     /* Start scheduler */
+    HAL_TIM_Base_Stop(&htim1);
     osKernelStart();
     while (1)  { }
+}
+void pre_sleep_proccess(){
+    HAL_TIM_Base_Stop(&htim1);
+}
+void post_sleep_proccess(){
+    HAL_TIM_Base_Start(&htim1);
 }
 
 /**
@@ -131,17 +160,22 @@ int main(void){
 void SystemClock_Config(void){
     RCC_OscInitTypeDef RCC_OscInitStruct;
     RCC_ClkInitTypeDef RCC_ClkInitStruct;
-    RCC_PeriphCLKInitTypeDef PeriphClkInit;
     /**Initializes the CPU, AHB and APB busses clocks*/
-    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
-    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-    RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+
+    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSE;
+    RCC_OscInitStruct.HSEState = RCC_HSE_OFF;
+    RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV2;
     RCC_OscInitStruct.HSIState = RCC_HSI_ON;
     RCC_OscInitStruct.LSIState = RCC_LSI_ON;
+#if RTC_USE
     RCC_OscInitStruct.LSEState = RCC_LSE_ON;
+#else
+    RCC_OscInitStruct.LSEState = RCC_LSE_OFF;
+#endif
+
     RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
+    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
+    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
     if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK){
         _Error_Handler(__FILE__, __LINE__);
     }
@@ -155,11 +189,26 @@ void SystemClock_Config(void){
     if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK){
         _Error_Handler(__FILE__, __LINE__);
     }
-    PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC|RCC_PERIPHCLK_ADC
-            |RCC_PERIPHCLK_USB;
-    PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
+    RCC_PeriphCLKInitTypeDef PeriphClkInit;
+    PeriphClkInit.PeriphClockSelection =0;
+    PeriphClkInit.PeriphClockSelection |=
+#if USB_USE
+            RCC_PERIPHCLK_USB|
+    #if ADC_USE
+            RCC_PERIPHCLK_ADC|
+    #endif
+#else
+    #if ADC_USE
+            RCC_PERIPHCLK_ADC|
+    #endif
+#endif
+    0;
+#if ADC_USE
     PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
+#endif
+#if USB_USE
     PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLL_DIV1_5;
+#endif
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK){
         _Error_Handler(__FILE__, __LINE__);
     }
@@ -168,7 +217,26 @@ void SystemClock_Config(void){
     /**Configure the Systick*/
     HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
     /* SysTick_IRQn interrupt configuration */
-    HAL_NVIC_SetPriority(SysTick_IRQn, 15, 0);
+    HAL_NVIC_SetPriority(SysTick_IRQn, 8, 0);
+}
+__STATIC_INLINE void SYSCLKConfig_FromSTOP(void){
+  /* Customize process using LL interface to improve the performance
+     (wake-up time from STOP quicker in LL than HAL)*/
+  /* HSE configuration and activation */
+  LL_RCC_HSI_Enable();
+  while(LL_RCC_HSI_IsReady() != 1) {}
+  LL_RCC_LSI_Enable();
+  while(LL_RCC_LSI_IsReady() != 1) {}
+  /* Main PLL activation */
+  LL_RCC_PLL_Enable();
+  while(LL_RCC_PLL_IsReady() != 1) {}
+  /* SYSCLK activation on the main PLL */
+  LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_PLL);
+  while(LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_STATUS_PLL){}
+  HAL_RTCEx_SetSecond_IT(&hrtc);
+  HAL_NVIC_SetPriority(RTC_IRQn, 12, 0);
+  HAL_NVIC_EnableIRQ(RTC_IRQn);
+
 }
 
 /* ADC1 init function */
@@ -197,14 +265,16 @@ static void MX_ADC1_Init(void){
     }
 
     /**Configure Injected Channel*/
+    /*common*/
     sConfigInjected.InjectedChannel = ADC_CHANNEL_0;
-    sConfigInjected.InjectedRank = ADC_INJECTED_RANK_1;
     sConfigInjected.InjectedNbrOfConversion = 4;
     sConfigInjected.InjectedSamplingTime = ADC_SAMPLETIME_239CYCLES_5;
     sConfigInjected.ExternalTrigInjecConv = ADC_INJECTED_SOFTWARE_START;
     sConfigInjected.AutoInjectedConv = DISABLE;
     sConfigInjected.InjectedDiscontinuousConvMode = ENABLE;
     sConfigInjected.InjectedOffset = 0;
+    /*specific*/
+    sConfigInjected.InjectedRank = ADC_INJECTED_RANK_1;
     if (HAL_ADCEx_InjectedConfigChannel(&hadc1, &sConfigInjected) != HAL_OK){
         _Error_Handler(__FILE__, __LINE__);
     }
@@ -241,9 +311,15 @@ static void MX_IWDG_Init(void){
 /* RTC init function */
 static void MX_RTC_Init(void){
     RTC_TimeTypeDef sTime;
-    __HAL_RCC_BKP_CLK_ENABLE();
+    RCC_PeriphCLKInitTypeDef PeriphClkInit;
+    PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC;
+    PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK){
+        _Error_Handler(__FILE__, __LINE__);
+    }
     __HAL_RCC_PWR_CLK_ENABLE();
     HAL_PWR_EnableBkUpAccess();
+    __HAL_RCC_BKP_CLK_ENABLE();
     __HAL_RCC_RTC_ENABLE();
     hrtc.Instance = RTC;
     hrtc.Init.AsynchPrediv = RTC_AUTO_1_SECOND;
@@ -256,16 +332,54 @@ static void MX_RTC_Init(void){
     data = BKP->DR1;
     if(data!=data_c){
         BKP->DR1 = data_c;
-        sTime.Hours = 0x0d;
-        sTime.Minutes = 0x00;
-        sTime.Seconds = 0x00;
-        if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK) {
+        sTime.Hours = 19;
+        sTime.Minutes = 0;
+        sTime.Seconds = 0;
+        if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK) {
             _Error_Handler(__FILE__, __LINE__);
         }
     }
     data = BKP->DR1;
+    HAL_NVIC_SetPriority(RTC_Alarm_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(RTC_Alarm_IRQn);
+    RTC_AlarmConfig();
 }
+static void RTC_AlarmConfig(void){
+  RTC_AlarmTypeDef salarmstructure = {{0}, 0};
+  RTC_TimeTypeDef sTime;
+  HAL_RTC_GetTime(&hrtc,&sTime,RTC_FORMAT_BIN);
+  if (sTime.Seconds>=58){
+      sTime.Seconds = 0;
+      if(sTime.Minutes == 59){
+          sTime.Minutes = 0;
+          if(sTime.Hours == 23){
+             sTime.Hours = 0;
+          }else{
+             sTime.Hours += 1;
+          }
+      }else{
+          sTime.Minutes += 1;
+      }
+  }else{
+      sTime.Seconds+=2;
+  }
 
+  /*##-3- Configure the RTC Alarm peripheral #################################*/
+  /* Set Alarm to 00:00:10
+     RTC Alarm Generation: Alarm on Hours, Minutes and Seconds */
+  salarmstructure.Alarm = RTC_ALARM_A;
+  salarmstructure.AlarmTime.Hours = sTime.Hours;
+  salarmstructure.AlarmTime.Minutes = sTime.Minutes;
+  salarmstructure.AlarmTime.Seconds = sTime.Seconds;
+  if(HAL_RTC_SetAlarm_IT(&hrtc,&salarmstructure,RTC_FORMAT_BIN) != HAL_OK){
+    /* Initialization Error */
+    Error_Handler();
+  }
+}
+void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc){
+    (void)hrtc;
+    RTC_AlarmConfig();
+}
 /* TIM3 init function */
 static void MX_TIM3_Init(void){
     TIM_ClockConfigTypeDef sClockSourceConfig = {0};
@@ -329,10 +443,74 @@ static void MX_USART1_UART_Init(void){
 */
 static void MX_GPIO_Init(void){
     /* GPIO Ports Clock Enable */
+#if USE_GPIO_PORT_C
     __HAL_RCC_GPIOC_CLK_ENABLE();
+#endif
+#if USE_GPIO_PORT_D
     __HAL_RCC_GPIOD_CLK_ENABLE();
+#endif
+#if USE_GPIO_PORT_A
     __HAL_RCC_GPIOA_CLK_ENABLE();
+#endif
+#if USE_GPIO_PORT_B
     __HAL_RCC_GPIOB_CLK_ENABLE();
+#endif
+#if STEP_BOARD
+    LL_GPIO_SetPinMode(DRV_STEP0_PORT, DRV_STEP0_LL, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(DRV_STEP0_PORT, DRV_STEP0_LL, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetOutputPin(DRV_STEP0_PORT, DRV_STEP0_LL);
+    LL_GPIO_SetPinMode(DRV_DIR0_PORT, DRV_DIR0_LL, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(DRV_DIR0_PORT, DRV_DIR0_LL, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetOutputPin(DRV_DIR0_PORT, DRV_DIR0_LL);
+    LL_GPIO_SetPinMode(DRV_STEP1_PORT, DRV_STEP1_LL, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(DRV_STEP1_PORT, DRV_STEP1_LL, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetOutputPin(DRV_STEP1_PORT, DRV_STEP1_LL);
+    LL_GPIO_SetPinMode(DRV_DIR1_PORT, DRV_DIR1_LL, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(DRV_DIR1_PORT, DRV_DIR1_LL, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_ResetOutputPin(DRV_DIR1_PORT, DRV_DIR1_LL);
+
+/*portb*/
+    LL_GPIO_SetPinMode(DRV_SLIP_PORT, DRV_SLIP_LL, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(DRV_SLIP_PORT, DRV_SLIP_LL, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetOutputPin(DRV_SLIP_PORT, DRV_SLIP_LL);
+
+    LL_GPIO_SetPinMode(DRV_RST_PORT, DRV_RST_LL, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(DRV_RST_PORT, DRV_RST_LL, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetOutputPin(DRV_RST_PORT, DRV_RST_LL);
+
+    LL_GPIO_SetPinMode(DRV_FLT_PORT, DRV_FLT_LL, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(DRV_FLT_PORT, DRV_FLT_LL, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetOutputPin(DRV_FLT_PORT, DRV_FLT_LL);
+
+    LL_GPIO_SetPinMode(DRV_EN_PORT, DRV_EN_LL, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(DRV_EN_PORT, DRV_EN_LL, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetOutputPin(DRV_EN_PORT, DRV_EN_LL);
+    LL_GPIO_SetPinMode(LED_PORT, LED_PIN, LL_GPIO_MODE_OUTPUT);
+#if CAR_KIDS
+    GPIO_InitTypeDef	gpinit;
+    gpinit.Mode = GPIO_MODE_INPUT;
+    gpinit.Pull = GPIO_PULLUP;
+    gpinit.Speed = GPIO_SPEED_FREQ_MEDIUM;
+    gpinit.Pin = CAR_DIRECTION_IN_HAL;
+    HAL_GPIO_Init(CAR_DIRECTION_IN_PORT,&gpinit);
+    gpinit.Pin = CAR_SPEED_IN_HAL;
+    HAL_GPIO_Init(CAR_SPEED_IN_PORT,&gpinit);
+    gpinit.Pin = CAR_ENGINE_IN_HAL;
+    HAL_GPIO_Init(CAR_ENGINE_IN_PORT,&gpinit);
+
+    LL_GPIO_SetPinMode(CAR_DIRECTION_OUT_PORT, CAR_DIRECTION_OUT_LL, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(CAR_DIRECTION_OUT_PORT, CAR_DIRECTION_OUT_LL, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_ResetOutputPin(CAR_DIRECTION_OUT_PORT, CAR_DIRECTION_OUT_LL);
+    LL_GPIO_SetPinMode(CAR_SPEED_OUT_PORT, CAR_SPEED_OUT_LL, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(CAR_SPEED_OUT_PORT, CAR_SPEED_OUT_LL, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_ResetOutputPin(CAR_SPEED_OUT_PORT, CAR_SPEED_OUT_LL);
+    LL_GPIO_SetPinMode(CAR_ENGINE_OUT_PORT, CAR_ENGINE_OUT_LL, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(CAR_ENGINE_OUT_PORT, CAR_ENGINE_OUT_LL, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_ResetOutputPin(CAR_ENGINE_OUT_PORT, CAR_ENGINE_OUT_LL);
+
+#endif
+
+#else
     LL_GPIO_SetPinMode(AIR_PORT, AIR_PIN, LL_GPIO_MODE_OUTPUT);
     LL_GPIO_SetPinMode(FLOW_PORT, FLOW_PIN, LL_GPIO_MODE_OUTPUT);
     LL_GPIO_SetPinMode(LIGTH1_PORT, LIGTH1_PIN, LL_GPIO_MODE_OUTPUT);
@@ -346,7 +524,13 @@ static void MX_GPIO_Init(void){
     LL_GPIO_SetPinOutputType(STEP_PORT, STEP_OUT2_1,LL_GPIO_OUTPUT_PUSHPULL);
     LL_GPIO_SetPinMode(STEP_PORT, STEP_OUT2_2, LL_GPIO_MODE_OUTPUT);
     LL_GPIO_SetPinOutputType(STEP_PORT, STEP_OUT2_2,LL_GPIO_OUTPUT_PUSHPULL);
+#endif
+    /*DS18b20 sensor*/
+    LL_GPIO_SetPinMode(DS18B20_GPIO, DS18B20_PIN_LL, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(DS18B20_GPIO, DS18B20_PIN_LL, LL_GPIO_OUTPUT_OPENDRAIN);
+    LL_GPIO_SetOutputPin(DS18B20_GPIO, DS18B20_PIN_LL);
 }
+#if USB_USE
 // The CDC recv buffer size should equal to the out endpoint size
 // or we will need a timeout to flush the recv buffer
 #define CDC_RX_EP_SIZE    32
@@ -403,34 +587,56 @@ static tusb_device_config_t device_config = {
     .interfaces = &device_interfaces[0],
     .ep_init = init_ep,
 };
-
+#endif
 /* StartDefaultTask function */
+static u32 test1 = 0;
 void own_task(void const * argument){
     (void)argument;
+#if IWDG_USE
     HAL_IWDG_Refresh(&hiwdg);
+#endif
+#if USB_USE
     tusb_device_t* dev = tusb_get_device(TEST_APP_USB_CORE);
     tusb_set_device_config(dev, &device_config);
     tusb_open_device(dev);
+#endif
 
     while(1){
+#if IWDG_USE
         HAL_IWDG_Refresh(&hiwdg);
-        osDelay(10);
+#endif
+/*        __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
+        HAL_SuspendTick();
+        EXTI->PR = 0xFFFFFFFF;
+        HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON, PWR_STOPENTRY_WFE);
+        SYSCLKConfig_FromSTOP();
+        HAL_ResumeTick();
+        test1++;*/
+        LL_GPIO_TogglePin(LED_PORT, LED_PIN);
+#if USB_USE
         if(cdc_len){
+            if (cdc_buf[0]==0x01){
+                LL_GPIO_TogglePin(DRV_DIR0_PORT, DRV_DIR0_LL);
+                LL_GPIO_TogglePin(DRV_DIR1_PORT, DRV_DIR1_LL);
+            }
             tusb_cdc_device_send(&cdc_dev, cdc_buf, (u16)cdc_len);
             cdc_len = 0;
         }
+#endif
+        osDelay(1000);
     }
 }
+
 
 
 /* TIM2 init function */
 static void MX_TIM2_Init(void){
     TIM_ClockConfigTypeDef sClockSourceConfig={0};
-    TIM_MasterConfigTypeDef sMasterConfig;
+    TIM_MasterConfigTypeDef sMasterConfig={0};
     htim2.Instance = TIM2;
-    htim2.Init.Prescaler = 71;
+    htim2.Init.Prescaler = (((HAL_RCC_GetPCLK2Freq())/ 1000000) - 1);//63
     htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-    htim2.Init.Period = 65500;
+    htim2.Init.Period = 0xffff;
     htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
     if (HAL_TIM_Base_Init(&htim2) != HAL_OK)  {
@@ -448,7 +654,7 @@ static void MX_TIM2_Init(void){
     if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)  {
         _Error_Handler(__FILE__, __LINE__);
     }
-
+    return;
 }
 
 

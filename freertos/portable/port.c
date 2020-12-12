@@ -504,7 +504,6 @@ void xPortSysTickHandler( void )
 			/* Clear the SysTick count flag and set the count value back to
 			zero. */
 			portNVIC_SYSTICK_CURRENT_VALUE_REG = 0UL;
-
 			/* Restart SysTick. */
 			portNVIC_SYSTICK_CTRL_REG |= portNVIC_SYSTICK_ENABLE_BIT;
 

@@ -132,6 +132,7 @@ HAL_StatusTypeDef HAL_InitTick(uint32_t TickPriority)
 void HAL_SuspendTick(void)
 {
   /* Disable TIM1 update Interrupt */
+  CLEAR_BIT(SysTick->CTRL, SysTick_CTRL_TICKINT_Msk);
   __HAL_TIM_DISABLE_IT(&htim1, TIM_IT_UPDATE);                                                  
 }
 

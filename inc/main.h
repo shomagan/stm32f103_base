@@ -53,6 +53,88 @@
 #include "type_def.h"
 #define SOFI_MONITOR 1
 #define MONITOR_MAX_TASKS 10
+#define STEP_BOARD 0
+#define CAR_KIDS 0
+#define FEEDER 1
+#define ADC_USE 0
+
+/*porta*/
+#define DRV_STEP0_LL LL_GPIO_PIN_7
+#define DRV_STEP0_HAL GPIO_PIN_7
+#define DRV_STEP0_PORT GPIOA
+#define DRV_DIR0_LL LL_GPIO_PIN_6
+#define DRV_DIR0_HAL GPIO_PIN_6
+#define DRV_DIR0_PORT GPIOA
+#define DRV_STEP1_LL LL_GPIO_PIN_5
+#define DRV_STEP1_HAL GPIO_PIN_5
+#define DRV_STEP1_PORT GPIOA
+#define DRV_DIR1_LL LL_GPIO_PIN_4
+#define DRV_DIR1_HAL GPIO_PIN_4
+#define DRV_DIR1_PORT GPIOA
+
+#define DRV_STEP2_LL LL_GPIO_PIN_3
+#define DRV_STEP2_HAL GPIO_PIN_3
+#define DRV_STEP2_PORT GPIOA
+#define CAR_DIRECTION_IN_LL DRV_STEP2_LL
+#define CAR_DIRECTION_IN_HAL DRV_STEP2_HAL
+#define CAR_DIRECTION_IN_PORT DRV_STEP2_PORT
+
+
+#define DRV_DIR2_LL LL_GPIO_PIN_2
+#define DRV_DIR2_HAL GPIO_PIN_2
+#define DRV_DIR2_PORT GPIOA
+#define CAR_DIRECTION_OUT_LL DRV_DIR2_LL
+#define CAR_DIRECTION_OUT_HAL DRV_DIR2_HAL
+#define CAR_DIRECTION_OUT_PORT DRV_DIR2_PORT
+
+
+#define DRV_STEP3_LL LL_GPIO_PIN_15
+#define DRV_STEP3_HAL GPIO_PIN_15
+#define DRV_STEP3_PORT GPIOB
+#define CAR_SPEED_IN_LL DRV_STEP3_LL
+#define CAR_SPEED_IN_HAL DRV_STEP3_HAL
+#define CAR_SPEED_IN_PORT DRV_STEP3_PORT
+
+#define DRV_DIR3_LL LL_GPIO_PIN_8
+#define DRV_DIR3_HAL GPIO_PIN_8
+#define DRV_DIR3_PORT GPIOA
+#define CAR_SPEED_OUT_LL DRV_DIR3_LL
+#define CAR_SPEED_OUT_HAL DRV_DIR3_HAL
+#define CAR_SPEED_OUT_PORT DRV_DIR3_PORT
+
+
+#define CAN_RX_LL LL_GPIO_PIN_8
+#define CAN_RX_HAL GPIO_PIN_8
+#define CAN_RX_PORT GPIOB
+#define CAR_ENGINE_OUT_LL CAN_RX_LL
+#define CAR_ENGINE_OUT_HAL CAN_RX_HAL
+#define CAR_ENGINE_OUT_PORT CAN_RX_PORT
+
+
+#define CAN_TX_LL LL_GPIO_PIN_9
+#define CAN_TX_HAL GPIO_PIN_9
+#define CAN_TX_PORT GPIOB
+#define CAR_ENGINE_IN_LL CAN_TX_LL
+#define CAR_ENGINE_IN_HAL CAN_TX_HAL
+#define CAR_ENGINE_IN_PORT CAN_TX_PORT
+
+
+
+/*portb*/
+#define DRV_SLIP_LL LL_GPIO_PIN_12
+#define DRV_SLIP_HAL GPIO_PIN_12
+#define DRV_SLIP_PORT GPIOB
+#define DRV_RST_LL LL_GPIO_PIN_13
+#define DRV_RST_HAL GPIO_PIN_13
+#define DRV_RST_PORT GPIOB
+#define DRV_FLT_LL LL_GPIO_PIN_14
+#define DRV_FLT_HAL GPIO_PIN_14
+#define DRV_FLT_PORT GPIOB
+#define DRV_EN_LL LL_GPIO_PIN_0
+#define DRV_EN_HAL GPIO_PIN_0
+#define DRV_EN_PORT GPIOB
+
+
 /*port a*/
 #define TRIGER_CONTROL_WITHOUT_PWM 1
 #define PID_OUT_PORT_0 GPIOA
@@ -80,6 +162,7 @@
 /*port b */
 #define	DS18B20_GPIO  GPIOB
 #define	DS18B20_PIN   GPIO_PIN_15
+#define	DS18B20_PIN_LL   LL_GPIO_PIN_15
 #define I2C1_SCL_PORT GPIOB
 #define I2C1_SCL  GPIO_PIN_8
 #define I2C1_SDA_PORT GPIOB
@@ -95,7 +178,6 @@
 /*port c */
 #define LED_PORT GPIOC
 #define LED_PIN  LL_GPIO_PIN_13
-
 extern IWDG_HandleTypeDef hiwdg;
 extern RTC_HandleTypeDef hrtc;
 extern TIM_HandleTypeDef htim2;
@@ -135,7 +217,7 @@ typedef enum {
     ERROR_OK = 0,
     ERROR_INIT = -1
 }error_t;
-
+extern u8 stop_mode;
 extern sofi_vars_t sofi;
 
 
@@ -150,7 +232,7 @@ extern sofi_vars_t sofi;
  extern "C" {
 #endif
 void _Error_Handler(char *, int);
-
+void SystemClock_Config(void);
 #define Error_Handler() _Error_Handler(__FILE__, __LINE__)
 #ifdef __cplusplus
 }

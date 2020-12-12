@@ -91,8 +91,11 @@
     #include <stdint.h>
     extern uint32_t SystemCoreClock;
 #endif
+void pre_sleep_proccess(void);
+void post_sleep_proccess(void);
 
-
+#define configUSE_TICKLESS_IDLE                  1
+#define configEXPECTED_IDLE_TIME_BEFORE_SLEEP    2
 #define configUSE_PREEMPTION                     1
 #define configSUPPORT_STATIC_ALLOCATION          0
 #define configSUPPORT_DYNAMIC_ALLOCATION         1

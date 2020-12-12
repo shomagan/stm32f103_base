@@ -108,7 +108,7 @@ set_target_properties(${BUILD_TARGET} PROPERTIES LINK_FLAGS
 target_compile_options(${BUILD_TARGET} PUBLIC 
                              -mcpu=${MCU_ARCH}
                              -mthumb -mthumb-interwork
-                              -g -O2
+                              -g -O0
                              -ffunction-sections -fdata-sections -fno-common -fmessage-length=0)
 
 target_compile_options(freertos_lib PUBLIC ${compile_options})

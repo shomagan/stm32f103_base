@@ -1,66 +1,26 @@
-
 #ifndef ONEWIRE_H
-#define ONEWIRE_H 
-
-/* C++ detection */
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include "stm32f1xx_hal.h"
+#define ONEWIRE_H
+#include "type_def.h"
 #include "cmsis_os.h"
+#include "stm32f1xx_hal.h"
+#define ONEWIRE_ROM_SIZE 8
+#define ONE_WIRE_MAX_DEVICE_NUMBER 5
+#define ONE_WIRE_MAX_ERROR_NUM 10
 
+typedef struct{
+    GPIO_TypeDef * port;
+    uint16_t pin;
+    u8 device_rom[ONEWIRE_ROM_SIZE];
+    u16 rezerved;
+}onewire_device_description_t;
+typedef struct{
+    float 		temperature;
+    uint8_t			data_validate;
+}ds18b20sensor_t;
+//###################################################################################
 
-typedef struct {
-	GPIO_TypeDef* GPIOx;           /*!< GPIOx port to be used for I/O functions */
-	uint16_t GPIO_Pin;             /*!< GPIO Pin to be used for I/O functions */
-	uint8_t LastDiscrepancy;       /*!< Search private */
-	uint8_t LastFamilyDiscrepancy; /*!< Search private */
-	uint8_t LastDeviceFlag;        /*!< Search private */
-	uint8_t ROM_NO[8];             /*!< 8-bytes address of last search device */
-} OneWire_t;
+extern ds18b20sensor_t	ds18b20[ONE_WIRE_MAX_DEVICE_NUMBER];
 
-/* OneWire delay */
-void ONEWIRE_DELAY(uint16_t time_us);
-
-/* Pin settings */
-void ONEWIRE_LOW(OneWire_t *gp);			
-void ONEWIRE_HIGH(OneWire_t *gp);		
-void ONEWIRE_INPUT(OneWire_t *gp);		
-void ONEWIRE_OUTPUT(OneWire_t *gp);		
-
-/* OneWire commands */
-#define ONEWIRE_CMD_RSCRATCHPAD			0xBE
-#define ONEWIRE_CMD_WSCRATCHPAD			0x4E
-#define ONEWIRE_CMD_CPYSCRATCHPAD		0x48
-#define ONEWIRE_CMD_RECEEPROM			0xB8
-#define ONEWIRE_CMD_RPWRSUPPLY			0xB4
-#define ONEWIRE_CMD_SEARCHROM			0xF0
-#define ONEWIRE_CMD_READROM				0x33
-#define ONEWIRE_CMD_MATCHROM			0x55
-#define ONEWIRE_CMD_SKIPROM				0xCC
-
-//#######################################################################################################
-void one_wire_init(OneWire_t* OneWireStruct, GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin);
-uint8_t OneWire_Reset(OneWire_t* OneWireStruct);
-uint8_t OneWire_ReadByte(OneWire_t* OneWireStruct);
-void OneWire_WriteByte(OneWire_t* OneWireStruct, uint8_t byte);
-void OneWire_WriteBit(OneWire_t* OneWireStruct, uint8_t bit);
-uint8_t OneWire_ReadBit(OneWire_t* OneWireStruct);
-uint8_t OneWire_Search(OneWire_t* OneWireStruct, uint8_t command);
-void OneWire_ResetSearch(OneWire_t* OneWireStruct);
-uint8_t one_wire_first(OneWire_t* OneWireStruct);
-uint8_t one_wire_next(OneWire_t* OneWireStruct);
-void one_wire_get_full_rom(OneWire_t* OneWireStruct, uint8_t *firstIndex);
-void OneWire_Select(OneWire_t* OneWireStruct, uint8_t* addr);
-void OneWire_SelectWithPointer(OneWire_t* OneWireStruct, uint8_t* ROM);
-uint8_t OneWire_CRC8(uint8_t* addr, uint8_t len);
-//#######################################################################################################
- 
-/* C++ detection */
-#ifdef __cplusplus
-}
-#endif
-
-#endif
-
+extern osThreadId ds18_id;
+void ds18_task( const void *parameters)__attribute__ ((noreturn));
+#endif //ONEWIRE_H
