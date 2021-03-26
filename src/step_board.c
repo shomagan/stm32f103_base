@@ -3,7 +3,7 @@
 #include "cmsis_os.h"
 #include "stm32f1xx_ll_gpio.h"
 #include "stm32f1xx_ll_tim.h"
-u32 time_to_going = 0;
+static u16 time_to_going = 0;
 void DELAY_US(uint16_t time_us){
     LL_TIM_SetCounter(TIM2, 0);
     LL_TIM_EnableCounter(TIM2);
@@ -43,12 +43,12 @@ void DELAY_US(uint16_t time_us){
     LL_TIM_DisableCounter(TIM2);
 }
 
-void step_board_task( const void *parameters){
+void car_step_board_task( const void *parameters){
     (void)parameters;
     while(1){
         LL_GPIO_TogglePin(DRV_STEP0_PORT, DRV_STEP0_LL);
         LL_GPIO_TogglePin(DRV_STEP1_PORT, DRV_STEP1_LL);
-        DELAY_US(400-time_to_going);
+        DELAY_US(1050-time_to_going);
         if(time_to_going<300){
             time_to_going+=1;
         }

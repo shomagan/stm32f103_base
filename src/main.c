@@ -130,8 +130,8 @@ int main(void){
     own_task_id = osThreadCreate(osThread(own_task), NULL);
 
 #if STEP_BOARD
-    osThreadDef(step_board_task, step_board_task, osPriorityNormal, 0, 364);
-    step_board_task_id = osThreadCreate(osThread(step_board_task), NULL);
+    osThreadDef(car_step_board_task, car_step_board_task, osPriorityNormal, 0, 364);
+    step_board_task_id = osThreadCreate(osThread(car_step_board_task), NULL);
 
 #else
     #if FEEDER
