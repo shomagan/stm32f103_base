@@ -51,12 +51,13 @@
 #ifndef __MAIN_H__
 #define __MAIN_H__
 #include "type_def.h"
-#define SOFI_MONITOR 1
-#define MONITOR_MAX_TASKS 10
-#define STEP_BOARD 0
-#define CAR_KIDS 0
-#define FEEDER 1
+
+#define STEP_BOARD 1
+#define CAR_KIDS 1
+#define FEEDER 0
 #define ADC_USE 0
+#define CONTROL_TASK 1
+#define DS18_TASK 1
 
 /*porta*/
 #define DRV_STEP0_LL LL_GPIO_PIN_7

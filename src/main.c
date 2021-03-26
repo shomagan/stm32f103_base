@@ -77,9 +77,11 @@ sofi_vars_t sofi;
 #if FEEDER
 static osThreadId step_task_id;
 #endif
-static osThreadId ds18_task_id,control_task_id;
+
 #if STEP_BOARD
 static osThreadId step_board_task_id;
+#else
+static osThreadId ds18_task_id,control_task_id;
 #endif
 
 
