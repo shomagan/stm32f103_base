@@ -332,8 +332,8 @@ static void MX_RTC_Init(void){
     data = BKP->DR1;
     if(data!=data_c){
         BKP->DR1 = data_c;
-        sTime.Hours = 19;
-        sTime.Minutes = 0;
+        sTime.Hours = 21;
+        sTime.Minutes = 15;
         sTime.Seconds = 0;
         if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK) {
             _Error_Handler(__FILE__, __LINE__);

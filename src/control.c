@@ -120,13 +120,8 @@ static void soft_handle_task( const void *parameters);
 
 typedef struct __attribute__((__packed__)){
     u16 number;
-    u32 stop_time;  //in seconde
+    u32 stop_time;  //in second
 }state_machine;
-static const time_table_t time_table_flow[] = {
-    {600,1200},
-    {810,1200},
-    {1020,1200},
-};
 
 static const time_table_t time_table_ligth1[] = {
     {600,1500},
@@ -174,10 +169,31 @@ static const time_table_t time_table_ligth2[] = {
 };
 
 static const time_table_t time_table_air[] = {
-    {602,3600},
-    {840,3600},
-    {1202,3600}
+    {600,600},
+    {660,600},
+    {720,600},
+    {780,600},
+    {840,600},
+    {900,600},
+    {960,600},
+    {1020,600},
+    {1080,600},
+    {1140,600},
 };
+
+static const time_table_t time_table_flow[] = {
+    {630,900},
+    {690,900},
+    {750,900},
+    {810,900},
+    {870,900},
+    {930,900},
+    {990,900},
+    {1050,900},
+    {1110,900},
+    {1170,900},
+};
+
 static state_machine flow,ligth1,ligth2,air;
 void control_task( const void *parameters){
     u32 tick=0;
@@ -393,38 +409,48 @@ u8 check_state_machine(){
         }
         if(flow.stop_time <= current_sec){
             flow_do_control(0);
-            SSD1306_DrawCircle(23, 33, 7, SSD1306_COLOR_BLACK,1.0);
+            SSD1306_DrawCircle(35, 33, 7, SSD1306_COLOR_BLACK,1.0);
             SSD1306_UpdateScreen();
 
         }else{
             u32 pass_time = current_sec - time_table_flow[flow.number].start_time * 60;
             float part = (float)pass_time/(float)time_table_flow[flow.number].length;
-            SSD1306_DrawCircle(23, 33, 7, SSD1306_COLOR_WHITE,part);
+            SSD1306_DrawCircle(35, 33, 7, SSD1306_COLOR_WHITE,part);
             SSD1306_UpdateScreen();
         }
         if(ligth1.stop_time <= current_sec){
             ligth1_do_control(0);
-            SSD1306_DrawCircle(38, 33, 7, SSD1306_COLOR_BLACK,1.0);
+            SSD1306_DrawCircle(70, 33, 7, SSD1306_COLOR_BLACK,1.0);
             SSD1306_UpdateScreen();
 
         }else{
             u32 pass_time = current_sec - time_table_ligth1[ligth1.number].start_time * 60;
             float part = (float)pass_time/(float)time_table_ligth1[ligth1.number].length;
-            SSD1306_DrawCircle(38, 33, 7, SSD1306_COLOR_WHITE,part);
+            SSD1306_DrawCircle(70, 33, 7, SSD1306_COLOR_WHITE,part);
             SSD1306_UpdateScreen();
 
         }
         if(ligth2.stop_time < current_sec){
             ligth2_do_control(0);
             soft_state_control(SOFT_DISABLE);
-            SSD1306_DrawCircle(53, 33, 7, SSD1306_COLOR_BLACK,1.0);
+            SSD1306_DrawCircle(98, 33, 7, SSD1306_COLOR_BLACK,1.0);
             SSD1306_UpdateScreen();
         }else{
             u32 pass_time = current_sec - time_table_ligth2[ligth2.number].start_time * 60;
             float part = (float)pass_time/(float)time_table_ligth2[ligth2.number].length;
-            SSD1306_DrawCircle(53, 33, 7, SSD1306_COLOR_WHITE,part);
+            SSD1306_DrawCircle(98, 33, 7, SSD1306_COLOR_WHITE,part);
             SSD1306_UpdateScreen();
         }
+        SSD1306_GotoXY(0, 12);
+        SSD1306_Puts("air", &Font_7x10, SSD1306_COLOR_WHITE);
+        SSD1306_GotoXY(28, 12);
+        SSD1306_Puts("flow", &Font_7x10, SSD1306_COLOR_WHITE);
+        SSD1306_GotoXY(63, 12);
+        SSD1306_Puts("led", &Font_7x10, SSD1306_COLOR_WHITE);
+        SSD1306_GotoXY(91, 12);
+        SSD1306_Puts("led", &Font_7x10, SSD1306_COLOR_WHITE);
+        SSD1306_UpdateScreen();
+
     }
 
     return 0x00;
