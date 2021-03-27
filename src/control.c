@@ -47,6 +47,7 @@
 #include "time_table.h"
 #include "stm32f1xx_ll_gpio.h"
 #include "main.h"
+#define USE_CONST_PWM 1
 /* fb pid */
 typedef union DataTypes_union{
     u8 bit:1;
@@ -101,7 +102,9 @@ static u8 check_state_machine(void);
 static void air_do_control(u8 enable);
 static void flow_do_control(u8 enable);
 static void ligth1_do_control(u8 enable);
-void ligth2_do_control(u8 enable);
+static void ligth2_do_control(u8 enable);
+static void set_pwm_value_const(float value);
+
 
 typedef enum{
     SOFT_DISABLE,
@@ -293,6 +296,7 @@ void control_task( const void *parameters){
         SSD1306_UpdateScreen();
         check_state_machine();
         HAL_IWDG_Refresh(&hiwdg);
+        set_pwm_value_const(40.0);
         osDelayUntil((uint32_t*)&time,1000);
     }
 }
@@ -455,28 +459,28 @@ u8 check_state_machine(){
 
     return 0x00;
 }
-void air_do_control(u8 enable){
+static void air_do_control(u8 enable){
     if(enable){
         LL_GPIO_SetOutputPin(AIR_PORT,AIR_PIN);
     }else{
         LL_GPIO_ResetOutputPin(AIR_PORT,AIR_PIN);
     }
 }
-void flow_do_control(u8 enable){
+static void flow_do_control(u8 enable){
     if(enable){
         LL_GPIO_SetOutputPin(FLOW_PORT,FLOW_PIN);
     }else{
         LL_GPIO_ResetOutputPin(FLOW_PORT,FLOW_PIN);
     }
 }
-void ligth1_do_control(u8 enable){
+static void ligth1_do_control(u8 enable){
     if(enable){
         LL_GPIO_SetOutputPin(LIGTH1_PORT,LIGTH1_PIN);
     }else{
         LL_GPIO_ResetOutputPin(LIGTH1_PORT,LIGTH1_PIN);
     }
 }
-void ligth2_do_control(u8 enable){
+static void ligth2_do_control(u8 enable){
     if(enable){
         LL_GPIO_SetOutputPin(LIGTH2_PORT,LIGTH2_PIN);
     }else{
@@ -504,6 +508,7 @@ void set_pwm_value(float value){
         pulse = (u16)(MAX_PWM_VALUE * value);
     }
     if(pulse_prev != pulse){
+#if USE_CONST_PWM==0
         pwm_handle.Pulse = pulse;
         pwm_handle.OCPolarity = TIM_OCPOLARITY_HIGH;
         pwm_handle.OCFastMode = TIM_OCFAST_ENABLE;
@@ -511,10 +516,42 @@ void set_pwm_value(float value){
             _Error_Handler(__FILE__, __LINE__);
         }
         HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+#endif
+
+    }
+}
+/**
+ * @brief set pwm output
+ * @param value - [0;100]
+ * */
+static void set_pwm_value_const(float value){
+    u16 pulse = 0;
+    static u16 pulse_prev = MAX_PWM_VALUE+1;
+    value = value > 100.0f?100.0f:value;
+    value = value < 0.0f?0.0f:value;
+    value = value/100.0f;
+    TIM_OC_InitTypeDef pwm_handle;
+    pwm_handle.OCMode = TIM_OCMODE_PWM1;
+    if(value >= 0.99f){
+        pulse = MAX_PWM_VALUE;
+    }else if(value <= 0.01f){
+        pulse = 0;
+    }else{
+        pulse = (u16)(MAX_PWM_VALUE * value);
+    }
+    if(pulse_prev != pulse){
+#if USE_CONST_PWM
+        pwm_handle.Pulse = pulse;
+        pwm_handle.OCPolarity = TIM_OCPOLARITY_HIGH;
+        pwm_handle.OCFastMode = TIM_OCFAST_ENABLE;
+        if (HAL_TIM_PWM_ConfigChannel(&htim3, &pwm_handle, TIM_CHANNEL_1) != HAL_OK){
+            _Error_Handler(__FILE__, __LINE__);
+        }
+        HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+#endif
         pulse_prev = pulse;
     }
 }
-
 /**
  * @brief set pwm output
  * @param value - [0;100]

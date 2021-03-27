@@ -140,8 +140,10 @@ int main(void){
     #endif
     osThreadDef(ds18_task, ds18_task, osPriorityNormal, 0, 364);
     ds18_task_id = osThreadCreate(osThread(ds18_task), NULL);
-    osThreadDef(control_task, control_task, osPriorityNormal, 0, 364);
-    control_task_id = osThreadCreate(osThread(control_task), NULL);
+    #if CONTROL_TASK
+        osThreadDef(control_task, control_task, osPriorityNormal, 0, 364);
+        control_task_id = osThreadCreate(osThread(control_task), NULL);
+    #endif
 #endif
     /* Start scheduler */
     HAL_TIM_Base_Stop(&htim1);
@@ -409,7 +411,7 @@ static void MX_TIM3_Init(void){
         _Error_Handler(__FILE__, __LINE__);
     }
     pwm_handle.OCMode = TIM_OCMODE_PWM1;
-    pwm_handle.Pulse = 16000;
+    pwm_handle.Pulse = 1000;
     pwm_handle.OCPolarity = TIM_OCPOLARITY_HIGH;
     pwm_handle.OCFastMode = TIM_OCFAST_DISABLE;
     if (HAL_TIM_PWM_ConfigChannel(&htim3, &pwm_handle, TIM_CHANNEL_1) != HAL_OK)  {
