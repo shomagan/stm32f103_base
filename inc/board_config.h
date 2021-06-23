@@ -48,8 +48,8 @@
 // #define  OTG_HS_ENABLE_DMA
 
 /* Support for other speed config and device qualifier descriptor */
-#define USB_USE 1
-#define RTC_USE 1
+#define USB_USE 0
+#define RTC_USE 0
 #define ADC_USE 0
 #define UART_USE 1
 #define USE_GPIO_PORT_A 1

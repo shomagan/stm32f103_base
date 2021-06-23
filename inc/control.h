@@ -51,7 +51,7 @@
 /*add functions and variable declarations below */
 extern TIM_HandleTypeDef htim3;
 void control_task( const void *parameters);
-#define MAX_PWM_VALUE 32768
+#define MAX_PWM_VALUE 4096
 /*add functions and variable declarations before */
 #ifdef __cplusplus
 }
