@@ -11,7 +11,7 @@ static void step_out_1_reverse(void);
 static void step_out_2_reverse(void);
 static void forward(int time);
 static void reverse(int time);
-#define STEP_DELAY 2
+#define STEP_DELAY 1
 
 void step_task( const void *parameters){
     (void)parameters;
@@ -24,12 +24,12 @@ void step_task( const void *parameters){
         HAL_RTC_GetTime(&hrtc,&time,RTC_FORMAT_BIN);
         u32 current_sec = time.Hours*3600 + time.Minutes*60 + time.Seconds;
         if((68461< current_sec) && (current_sec< 68481)){
-            forward(20);
+            forward(60);
             kernel_tick = osKernelSysTick();
             osDelayUntil(&kernel_tick, 20000);
         }
-        if((10861< current_sec) && (current_sec< 10881)){
-            forward(20);
+        if((28800< current_sec) && (current_sec< 28820)){
+            forward(60);
             kernel_tick = osKernelSysTick();
             osDelayUntil(&kernel_tick, 20000);
         }
@@ -37,7 +37,7 @@ void step_task( const void *parameters){
         osDelayUntil(&kernel_tick, 2000);
     }
 }
-/*@time in ms(% 4)
+/*@time in ms multiply 4
  *@brief refresh watchdog timer
  * */
 void forward(int time){
