@@ -153,7 +153,12 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* hi2c){
       hi2c->Instance->CR1 |= I2C_CR1_SWRST;
      // 14
       hi2c->Instance->CR1 ^= I2C_CR1_SWRST;
+#if REMAPED_I2C
       __HAL_AFIO_REMAP_I2C1_ENABLE();
+#else
+      __HAL_AFIO_REMAP_I2C1_DISABLE();
+#endif
+
      // 15
       __HAL_I2C_ENABLE(hi2c);
       resetTried = 1;
@@ -174,23 +179,19 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* hi2c)
       __HAL_RCC_I2C1_CLK_DISABLE();
 
       /**I2C1 GPIO Configuration
-      PB8     ------> I2C1_SCL
-      PB9     ------> I2C1_SDA
+      PB6     ------> I2C1_SCL
+      PB7     ------> I2C1_SDA
       */
-      HAL_GPIO_DeInit(GPIOB, GPIO_PIN_8|GPIO_PIN_9);
-      LL_GPIO_SetPinMode(GPIOB, GPIO_PIN_8, LL_GPIO_MODE_OUTPUT);
-      LL_GPIO_SetPinMode(GPIOB, GPIO_PIN_9, LL_GPIO_MODE_OUTPUT);
+      HAL_GPIO_DeInit(GPIOB, I2C1_SCL|I2C1_SDA);
+      LL_GPIO_SetPinMode(GPIOB, I2C1_SCL, LL_GPIO_MODE_OUTPUT);
+      LL_GPIO_SetPinMode(GPIOB, I2C1_SDA, LL_GPIO_MODE_OUTPUT);
       for (uint8_t i =0;i<8;i++){
-          LL_GPIO_SetOutputPin(GPIOB,GPIO_PIN_8);
-          LL_GPIO_SetOutputPin(GPIOB,GPIO_PIN_9);
-          LL_GPIO_ResetOutputPin(GPIOB,GPIO_PIN_8);
-          LL_GPIO_ResetOutputPin(GPIOB,GPIO_PIN_9);
+          LL_GPIO_SetOutputPin(GPIOB,I2C1_SCL);
+          LL_GPIO_SetOutputPin(GPIOB,I2C1_SDA);
+          LL_GPIO_ResetOutputPin(GPIOB,I2C1_SCL);
+          LL_GPIO_ResetOutputPin(GPIOB,I2C1_SDA);
       }
-      HAL_GPIO_DeInit(GPIOB, GPIO_PIN_8|GPIO_PIN_9);
-      __HAL_AFIO_REMAP_I2C1_ENABLE();
-      /* Peripheral clock enable */
-      __HAL_RCC_I2C1_CLK_ENABLE();
-
+      HAL_GPIO_DeInit(GPIOB, I2C1_SCL|I2C1_SDA);
   }
 } 
 

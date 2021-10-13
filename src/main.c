@@ -96,10 +96,78 @@ static void MX_USART1_UART_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void RTC_AlarmConfig(void);
+static void cable_heat_gpio_init(void);
 void own_task(void const * argument);
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 u8 stop_mode = 0;
+#define STORE_SPACE_ADDRESS_LD 0x800FC00
+static CRC_HandleTypeDef hcrc;
+stored_data_t stored_data;
+/**
+ * @brief read stored data from flash
+ */
+static void read_stored_flash(stored_data_t *stored_data){
+    HAL_FLASH_Unlock();
+    memcpy(stored_data->bytes,(void*)STORE_SPACE_ADDRESS_LD,FLASH_PAGE_SIZE);
+    HAL_FLASH_Lock();
+}
+/**
+ * @brief save_stored_struct
+ * @param stored_data
+ * @return none zero value if an error occured
+ */
+int save_stored_struct(stored_data_t *stored_data){
+    FLASH_EraseInitTypeDef eraseInitStruct = {0};
+    stored_data->stored_struct.flash_write_counter++;
+    stored_data->stored_struct.crc = HAL_CRC_Calculate(&hcrc, (void*)stored_data->bytes, (sizeof(stored_struct_t)-4)/4);
+    HAL_FLASH_Unlock();
+    uint32_t PageError = 0;
+    eraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;
+    eraseInitStruct.PageAddress = STORE_SPACE_ADDRESS_LD;
+    eraseInitStruct.NbPages = 1;
+    HAL_FLASHEx_Erase(&eraseInitStruct, &PageError);
+    for (uint32_t i = 0; i < sizeof(stored_struct_t); i+=4){
+        HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, STORE_SPACE_ADDRESS_LD + i, stored_data->bytes[i/4]);
+    }
+    HAL_FLASH_Lock();
+    return 0;
+}/**
+ * @brief check_stored_struct
+ * @param stored_data
+ * @return 1 if stored 0- if crc mismatch <0 if error occured
+ */
+static int check_stored_struct(stored_data_t *stored_data){
+    int res = 0;
+    if (stored_data->stored_struct.size_of_table<FLASH_PAGE_SIZE){
+        if(HAL_CRC_Calculate(&hcrc, (void*)stored_data->bytes, (stored_data->stored_struct.size_of_table) / 4)==0){
+            u8 changed = 0;
+            if (stored_data->stored_struct.temperature_min>30){
+                stored_data->stored_struct.temperature_min = CABLE_HEAT_MIN_VALUE;
+                changed =1;
+            }
+            if (stored_data->stored_struct.temperature_triger>50){
+                stored_data->stored_struct.temperature_triger = CABLE_HEAT_TRIGGER;
+                changed =1;
+            }
+            if (changed){
+                save_stored_struct(stored_data);
+            }
+            res = 1;
+        }
+    }
+    if (res !=1){
+        //not compared
+        stored_data->stored_struct.size_of_table = sizeof(stored_struct_t);
+        stored_data->stored_struct.temperature_min = CABLE_HEAT_MIN_VALUE;
+        stored_data->stored_struct.temperature_triger = CABLE_HEAT_TRIGGER;
+        stored_data->stored_struct.flash_write_counter = 0;
+        stored_data->stored_struct.last_flashed_unix_time = 0;
+        stored_data->stored_struct.trigers_num = 0;
+        res = save_stored_struct(stored_data);
+    }
+    return res;
+}
 
 /**
   * @brief  The application entry point.
@@ -122,8 +190,19 @@ int main(void){
 #if UART_USE
     MX_USART1_UART_Init();
 #endif
+#if CRC_USE
+    hcrc.Instance = CRC;
+    if (HAL_CRC_Init(&hcrc) != HAL_OK){
+
+    }
+#endif
 #if STEP_BOARD==0
     MX_TIM3_Init();
+#endif
+#if CABLE_HEATING
+    read_stored_flash(&stored_data);
+    check_stored_struct(&stored_data);
+    cable_heat_gpio_init();
 #endif
     MX_TIM2_Init();
     osThreadDef(own_task, own_task, osPriorityNormal, 0, 364);
@@ -167,8 +246,8 @@ void SystemClock_Config(void){
     /**Initializes the CPU, AHB and APB busses clocks*/
 
     RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSE;
-    RCC_OscInitStruct.HSEState = RCC_HSE_OFF;
-    RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV2;
+    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+    RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
     RCC_OscInitStruct.HSIState = RCC_HSI_ON;
     RCC_OscInitStruct.LSIState = RCC_LSI_ON;
 #if RTC_USE
@@ -178,8 +257,8 @@ void SystemClock_Config(void){
 #endif
 
     RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
-    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
+    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL6;
     if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK){
         _Error_Handler(__FILE__, __LINE__);
     }
@@ -211,7 +290,7 @@ void SystemClock_Config(void){
     PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
 #endif
 #if USB_USE
-    PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLL_DIV1_5;
+    PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLL;
 #endif
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK){
         _Error_Handler(__FILE__, __LINE__);
@@ -336,8 +415,8 @@ static void MX_RTC_Init(void){
     data = BKP->DR1;
     if(data!=data_c){
         BKP->DR1 = data_c;
-        sTime.Hours = 21;
-        sTime.Minutes = 15;
+        sTime.Hours = 14;
+        sTime.Minutes = 5;
         sTime.Seconds = 0;
         if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK) {
             _Error_Handler(__FILE__, __LINE__);
@@ -618,12 +697,22 @@ void own_task(void const * argument){
         test1++;*/
         LL_GPIO_TogglePin(LED_PORT, LED_PIN);
 #if USB_USE
-        if(cdc_len){
-            if (cdc_buf[0]==0x01){
-                LL_GPIO_TogglePin(DRV_DIR0_PORT, DRV_DIR0_LL);
-                LL_GPIO_TogglePin(DRV_DIR1_PORT, DRV_DIR1_LL);
+        if(cdc_len==4){
+            if (cdc_buf[0]==0xee && cdc_buf[3]==0xee){
+                u8 ch = 0xaa;
+                if (cdc_buf[1]<30){
+                    stored_data.stored_struct.temperature_min = cdc_buf[1];
+                }
+                if (cdc_buf[2]<50){
+                    stored_data.stored_struct.temperature_triger = cdc_buf[2];
+                }
+                tusb_cdc_device_send(&cdc_dev, &ch, 1);
+                save_stored_struct(&stored_data);
+            }else{
+                u8 ch = 0xbb;
+                tusb_cdc_device_send(&cdc_dev, &ch, 1);
             }
-            tusb_cdc_device_send(&cdc_dev, cdc_buf, (u16)cdc_len);
+
             cdc_len = 0;
         }
 #endif
@@ -674,6 +763,15 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
     if (htim->Instance == TIM1) {
         HAL_IncTick();
     }
+}
+static void cable_heat_gpio_init(){
+    /**TIM3 GPIO Configuration PA6------> TIM3_CH1*/
+    GPIO_InitTypeDef GPIO_InitStruct;
+    GPIO_InitStruct.Pin = PID_OUT_PIN_HAL_0;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(PID_OUT_PORT_0, &GPIO_InitStruct);
+    LL_GPIO_ResetOutputPin(PID_OUT_PORT_0, PID_OUT_PIN_LL_0);
 }
 
 /**

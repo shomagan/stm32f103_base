@@ -52,12 +52,14 @@
 #define __MAIN_H__
 #include "type_def.h"
 
-#define STEP_BOARD 1
-#define CAR_KIDS 1
-#define FEEDER 0
+#define STEP_BOARD 0
+#define CAR_KIDS 0
+#define FEEDER 1
 #define ADC_USE 0
 #define CONTROL_TASK 1
 #define DS18_TASK 1
+#define REMAPED_I2C 0
+#define CABLE_HEATING 1
 
 /*porta*/
 #define DRV_STEP0_LL LL_GPIO_PIN_7
@@ -139,7 +141,7 @@
 /*port a*/
 #define TRIGER_CONTROL_WITHOUT_PWM 1
 #define PID_OUT_PORT_0 GPIOA
-#define PID_OUT_PIN_0 LL_GPIO_PIN_6
+#define PID_OUT_PIN_LL_0 LL_GPIO_PIN_6
 #define PID_OUT_PIN_HAL_0 GPIO_PIN_6
 
 #define AIR_PORT GPIOA
@@ -165,17 +167,29 @@
 #define	DS18B20_PIN   GPIO_PIN_15
 #define	DS18B20_PIN_LL   LL_GPIO_PIN_15
 #define I2C1_SCL_PORT GPIOB
-#define I2C1_SCL  GPIO_PIN_8
 #define I2C1_SDA_PORT GPIOB
+#if REMAPED_I2C
+#define I2C1_SCL  GPIO_PIN_8
 #define I2C1_SDA  GPIO_PIN_9
+#else
+#define I2C1_SCL  GPIO_PIN_6
+#define I2C1_SDA  GPIO_PIN_7
+#endif
+
+
 #define STEP_OUT1_1 LL_GPIO_PIN_13
 #define STEP_OUT1_2 LL_GPIO_PIN_14
 #define STEP_OUT2_1 LL_GPIO_PIN_11
 #define STEP_OUT2_2 LL_GPIO_PIN_12
 #define STEP_PORT GPIOB
 #define PID_OUT_PORT_3 GPIOB
+#if REMAPED_I2C
 #define PID_OUT_PIN_3 LL_GPIO_PIN_6
 #define PID_OUT_PIN_HAL_3 GPIO_PIN_6
+#else
+#define PID_OUT_PIN_3 LL_GPIO_PIN_8
+#define PID_OUT_PIN_HAL_3 GPIO_PIN_8
+#endif
 /*port c */
 #define LED_PORT GPIOC
 #define LED_PIN  LL_GPIO_PIN_13
@@ -218,6 +232,31 @@ typedef enum {
     ERROR_OK = 0,
     ERROR_INIT = -1
 }error_t;
+#define CABLE_HEAT_MIN_VALUE 3
+#define CABLE_HEAT_TRIGGER 7
+
+typedef struct MCU_PACK{
+    u32 size_of_table;
+    u32 flash_write_counter;
+    s32 last_flashed_unix_time;
+    u16 temperature_min;
+    u16 temperature_triger;
+    u32 trigers_num;
+    uint32_t crc;
+}stored_struct_t;
+
+typedef union {
+    stored_struct_t stored_struct;
+    uint32_t bytes[FLASH_PAGE_SIZE/4];
+}stored_data_t;
+/**
+ * @brief save_stored_struct
+ * @param stored_data
+ * @return none zero value if an error occured
+ */
+int save_stored_struct(stored_data_t *stored_data);
+
+extern stored_data_t stored_data;
 extern u8 stop_mode;
 extern sofi_vars_t sofi;
 

@@ -89,20 +89,24 @@ void ds18_task( const void *parameters){
                 errors_num++;
             }
             osDelay(750);
-            float temp;
-            temp = read_temp(&onewire_device_descriptions[0]);
-            if(temp > -90.0f){
-                ds18b20[0].temperature = temp;
-                ds18b20[0].data_validate = 1;
-                errors_num = 0;
-            }else{
-                errors_num++;
+            for (u8 i =0;i<device_connected;i++){
+                float temp;
+                temp = read_temp(&onewire_device_descriptions[i]);
+                if(temp > -90.0f){
+                    ds18b20[i].temperature = temp;
+                    ds18b20[i].data_validate = 1;
+                    errors_num = 0;
+                }else{
+                    errors_num++;
+                }
             }
 #if DEBUG
             main_printf("ds18b20 temp = %f", regs_global.vars.temperature_out);
 #endif
         }else{
-            ds18b20[0].data_validate = 0;
+            for (u8 i =0;i<ONE_WIRE_MAX_DEVICE_NUMBER;i++){
+                ds18b20[i].data_validate = 0;
+            }
             osDelay(750);
             device_connected = scan(&onewire_device_descriptions[0]);
             if(device_connected>0){

@@ -47,7 +47,7 @@
 #include "time_table.h"
 #include "stm32f1xx_ll_gpio.h"
 #include "main.h"
-#define USE_CONST_PWM 1
+#define USE_CONST_PWM 0
 /* fb pid */
 typedef union DataTypes_union{
     u8 bit:1;
@@ -95,7 +95,6 @@ void pid_exec(pid_in_type * FBInputs,pid_var_type * FBVars,\
 
 #define DEFAULT_OUT 0.0f
 #define REQUIRE_VALUE -40.0f
-
 static void set_pwm_value(float value);
 static void set_controller_value(float value);
 static u8 check_state_machine(void);
@@ -201,6 +200,7 @@ static state_machine flow,ligth1,ligth2,air;
 void control_task( const void *parameters){
     u32 tick=0;
     u32 time;
+#if CABLE_HEATING==0
     pid_in_type in;
     pid_var_type var;
     pid_out_type out;
@@ -217,6 +217,7 @@ void control_task( const void *parameters){
     in.kd.data.float32 = -100.0f;
     in.position.data.float32 = DEFAULT_OUT;
     in.gist_tube.data.float32 = 0.5f;
+#endif
     HAL_IWDG_Refresh(&hiwdg);
     HAL_IWDG_Refresh(&hiwdg);
     flow.stop_time = 0;
@@ -229,15 +230,23 @@ void control_task( const void *parameters){
     time = osKernelSysTick();
     SSD1306_Init();
     SSD1306_UpdateScreen();
+#if CABLE_HEATING
+    u8 enabled = 0;
+    u8 first_start=0;
+#endif
     while(1){
         //ds18_time = osKernelSysTick();
         u8 sensor_data_valid;
         tick++;
         sensor_data_valid = 0;
+#if CABLE_HEATING==0
         if(ds18b20[0].data_validate) {
             in.current_value.data.float32  = ds18b20[0].temperature;
         }
         pid_exec(&in,&var,&out);
+#else
+
+#endif
         if(SSD1306.error_num){
             SSD1306.Initialized = 0;
         }
@@ -247,33 +256,108 @@ void control_task( const void *parameters){
             }
         }
         if(ds18b20[0].data_validate) {
-            static float value;
             char buff[32] = "temp - ";
             buff[9] = 0;
+#if CABLE_HEATING==0
             SSD1306_GotoXY(0, 44);
+#else
+            SSD1306_GotoXY(0, 15);
+#endif
             SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE);
-            int temp;
+            int temp1,temp2,min_temp;
+            temp2 = -0;
+#if CABLE_HEATING==0
+            static float value;
             value = out.output.data.float32 >= 0.0f?out.output.data.float32:0.0f;
             set_controller_value(value);
             in.position.data.float32 = out.output.data.float32;
             temp = (int)in.current_value.data.float32;
-            itoa(temp,buff,10);
+#else
+
+
+            temp1 = ds18b20[0].temperature;
+            min_temp = temp1;
+            if(ds18b20[1].data_validate == 1){
+                temp2 = ds18b20[1].temperature;
+                if (temp2<min_temp){
+                    min_temp = temp2;
+                }
+            }
+            if(!enabled){
+                if (min_temp<=(stored_data.stored_struct.temperature_min)){
+                    enabled = 1;
+                    LL_GPIO_SetOutputPin(PID_OUT_PORT_0, PID_OUT_PIN_LL_0);
+                    stored_data.stored_struct.trigers_num++;
+                    save_stored_struct(&stored_data);
+                }
+            }else{
+                if (min_temp>(stored_data.stored_struct.temperature_min+stored_data.stored_struct.temperature_triger)){
+                    enabled = 0;
+                    LL_GPIO_ResetOutputPin(PID_OUT_PORT_0, PID_OUT_PIN_LL_0);
+                }
+            }
+            if((osKernelSysTick()<(1000*60)) && (first_start<2)){
+                if(first_start == 0){
+                    stored_data.stored_struct.trigers_num++;
+                    save_stored_struct(&stored_data);
+                    first_start = 1;
+                }
+                LL_GPIO_SetOutputPin(PID_OUT_PORT_0, PID_OUT_PIN_LL_0);
+            }else{
+                if(first_start==1){
+                    if(!enabled){
+                        LL_GPIO_ResetOutputPin(PID_OUT_PORT_0, PID_OUT_PIN_LL_0);
+                    }
+                    first_start = 2;
+                }
+            }
+#endif
+            itoa(temp1,buff,10);
+            SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE);
+            SSD1306_Puts(" ", &Font_7x10, SSD1306_COLOR_WHITE);
+            itoa(temp2,buff,10);
             SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE);
             buff[0] = ' ';buff[1] = 'C';buff[2] = ' ';buff[3] = ' ';buff[4] = ' ';
             buff[5] = ' ';
             SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE);
+#if CABLE_HEATING
+            SSD1306_GotoXY(0, 30);
+            if (enabled){
+                SSD1306_Puts("heater on   ", &Font_7x10, SSD1306_COLOR_WHITE);
+            }else if(first_start==1){
+                SSD1306_Puts("heater test ", &Font_7x10, SSD1306_COLOR_WHITE);
+            }else{
+                SSD1306_Puts("heater off  ", &Font_7x10, SSD1306_COLOR_WHITE);
+            }
+            SSD1306_GotoXY(0, 45);
+            SSD1306_Puts("trigers", &Font_7x10, SSD1306_COLOR_WHITE);
+            SSD1306_GotoXY(64, 45);
+            itoa(stored_data.stored_struct.trigers_num,buff,10);
+            SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE);
+            SSD1306_Puts("   ", &Font_7x10, SSD1306_COLOR_WHITE);
+#endif
             SSD1306_UpdateScreen();
         }else{
+
             char buff[] = "temperature off";
-            SSD1306_GotoXY(0, 44); //Устанавливаем курсор в позицию 0;44. Сначала по горизонтали, потом вертикали.
+#if CABLE_HEATING==0
+            SSD1306_GotoXY(0, 44);
+#else
+            SSD1306_GotoXY(0, 15);
+            LL_GPIO_ResetOutputPin(PID_OUT_PORT_0, PID_OUT_PIN_LL_0);
+            enabled = 0;
+#endif
             SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
             SSD1306_UpdateScreen();
             set_controller_value(DEFAULT_OUT);
+#if CABLE_HEATING==0
             in.position.data.float32 = DEFAULT_OUT;	    	// float - необходимое положение регулятора в процентах
+#endif
         }
         RTC_TimeTypeDef rtc_time;
         HAL_RTC_GetTime(&hrtc,&rtc_time,RTC_FORMAT_BIN);
         SSD1306_GotoXY(0, 0); //Устанавливаем курсор в позицию 0;44. Сначала по горизонтали, потом вертикали.
+#if CABLE_HEATING==0
         char buff[32] = "time ";
         buff[7] = 0;
         SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
@@ -293,8 +377,25 @@ void control_task( const void *parameters){
             buff[i] = ' ';
         }
         SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+#else
+        char buff[32] = "min ";
+        SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE);
+        itoa(stored_data.stored_struct.temperature_min,buff,10);
+        SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE);
+        memcpy(buff," trig ",6);
+        buff[6] = 0;
+        SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE);
+        itoa(stored_data.stored_struct.temperature_triger,buff,10);
+        SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE);
+        for (u8 i=0;i<5;i++){
+            buff[i] = ' ';
+        }
+        SSD1306_Puts(buff, &Font_7x10, SSD1306_COLOR_WHITE); //пишем надпись в выставленной позиции шрифтом "Font_7x10" белым цветом.
+#endif
         SSD1306_UpdateScreen();
+#if CABLE_HEATING==0
         check_state_machine();
+#endif
         HAL_IWDG_Refresh(&hiwdg);
         set_pwm_value_const(40.0);
         osDelayUntil((uint32_t*)&time,1000);
