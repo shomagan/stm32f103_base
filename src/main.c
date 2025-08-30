@@ -56,7 +56,7 @@
 #include "step.h"
 #include "main.h"
 #include "tusbd_cdc.h"
-#define FEEDER 1
+#define FEEDER 0
 #define ADC_USE 0
 
 /* Private variables ---------------------------------------------------------*/

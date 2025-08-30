@@ -51,7 +51,7 @@
 #ifndef __MAIN_H__
 #define __MAIN_H__
 /*port a*/
-#define TRIGER_CONTROL_WITHOUT_PWM 1
+#define TRIGER_CONTROL_WITHOUT_PWM 0
 #define PID_OUT_PORT_0 GPIOA
 #define PID_OUT_PIN_0 LL_GPIO_PIN_6
 #define PID_OUT_PIN_HAL_0 GPIO_PIN_6
@@ -68,6 +68,9 @@
 
 #define AIR_PORT GPIOA
 #define AIR_PIN  LL_GPIO_PIN_7
+#define PWM_LIGTH_PORT GPIOA
+#define PWM_LIGTH_PIN  LL_GPIO_PIN_6
+
 #define FLOW_PORT GPIOA
 #define FLOW_PIN  LL_GPIO_PIN_5
 #define LIGTH_PORT GPIOA
