@@ -64,6 +64,8 @@
 #if STEP_BOARD
 #include "step_board.h"
 #endif
+#define FEEDER 0
+#define ADC_USE 0
 
 /* Private variables ---------------------------------------------------------*/
 static ADC_HandleTypeDef hadc1;
